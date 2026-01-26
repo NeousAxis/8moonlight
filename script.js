@@ -237,9 +237,12 @@ function updateApp() {
     els.illuminationText.textContent = `${Math.round(data.illumination * 100)}% d'illumination`;
     els.moonAge.textContent = `${data.age.toFixed(1)} jours`;
 
-    // Update Header Display avec ce que l'utilisateur a tapé ou défaut (Genève)
-    els.headerCity.textContent = state.city || "Genève";
-    els.headerCountry.textContent = state.country || "Suisse";
+    // Display: Priorité au state utilisateur, sinon fallback Genève
+    const displayCity = state.city || (state.lat === 46.20 && state.lon === 6.14 ? "Genève" : "Ma Position");
+    const displayCountry = state.country || (state.lat === 46.20 && state.lon === 6.14 ? "Suisse" : "");
+
+    els.headerCity.textContent = displayCity;
+    els.headerCountry.textContent = displayCountry;
 
     // 2. Visual
     drawMoon(data.phaseFraction, hemisphere);
@@ -370,23 +373,19 @@ document.getElementById('btnGps').addEventListener('click', () => {
                 .then(data => {
                     if (data && data.address) {
                         const addr = data.address;
-                        state.city = addr.city || addr.town || addr.village || addr.municipality || addr.hamlet || "Ma Position";
+                        state.city = addr.city || addr.town || addr.village || addr.municipality || addr.hamlet || "Position GPS";
                         state.country = addr.country || "";
-                        els.gpsStatus.textContent = `Position trouvée : ${state.city}`;
+                        els.gpsStatus.textContent = `Position : ${state.city}`;
                     } else {
-                        state.city = "Ma Position";
-                        state.country = "";
-                        els.gpsStatus.textContent = "Position trouvée !";
+                        els.gpsStatus.textContent = "Position trouvée (nom inconnu)";
                     }
                     saveState();
                     updateApp();
                 })
                 .catch(() => {
-                    state.city = "Ma Position";
-                    state.country = "";
+                    els.gpsStatus.textContent = "Position trouvée !";
                     saveState();
                     updateApp();
-                    els.gpsStatus.textContent = "Position trouvée !";
                 });
         }, () => {
             els.gpsStatus.textContent = "Erreur GPS / Refus permission.";
