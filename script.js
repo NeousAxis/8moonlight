@@ -373,8 +373,15 @@ document.getElementById('btnGps').addEventListener('click', () => {
                 .then(data => {
                     if (data && data.address) {
                         const addr = data.address;
-                        state.city = addr.city || addr.town || addr.village || addr.municipality || addr.hamlet || "Position GPS";
+                        // Priorité : Ville réelle > Ville > Province (pour les villes à statut spécial comme Da Nang) > District
+                        state.city = addr.city || addr.town || addr.state || addr.province || addr.municipality || addr.village || "Position GPS";
                         state.country = addr.country || "";
+
+                        // Nettoyage spécifique pour le Vietnam (on veut Da Nang, pas le quartier/phường)
+                        if (state.city.includes("Phường") || state.city.includes("Huyện")) {
+                            if (addr.state || addr.province) state.city = addr.state || addr.province;
+                        }
+
                         els.gpsStatus.textContent = `Position : ${state.city}`;
                     } else {
                         els.gpsStatus.textContent = "Position trouvée (nom inconnu)";
