@@ -34,7 +34,8 @@ const els = {
     gardenIcon: document.getElementById('gardenIcon'),
     gardenType: document.getElementById('gardenType'),
     gardenAction: document.getElementById('gardenAction'),
-    moodText: document.getElementById('moodText')
+    moodText: document.getElementById('moodText'),
+    seasonalText: document.getElementById('seasonalText')
 };
 
 // --- Constants ---
@@ -66,6 +67,26 @@ const MOOD_ADVICE = {
     new: "🌑 Nouvelle Lune : Posez vos intentions pour le cycle à venir.",
     full: "🌕 Pleine Lune : Émotions intenses. Célébrez vos accomplissements."
 };
+
+const SEASON_DATA = {
+    0: { fruits: "Pomme, Poire, Clémentine, Kiwi", veggies: "Poireau, Chou, Carotte, Endive" }, // Jan
+    1: { fruits: "Pomme, Poire, Kiwi, Mandarine", veggies: "Poireau, Épinard, Chou, Carotte" }, // Fév
+    2: { fruits: "Pomme, Kiwi, Citron", veggies: "Asperge, Épinard, Radis, Poireau" }, // Mars
+    3: { fruits: "Pomme, Rhubarbe", veggies: "Asperge, Artichaut, Petit pois, Radis" }, // Avril
+    4: { fruits: "Fraise, Rhubarbe", veggies: "Asperge, Artichaut, Fève, Petit pois" }, // Mai
+    5: { fruits: "Fraise, Cerise, Framboise, Melon", veggies: "Courgette, Haricot vert, Tomate, Poivron" }, // Juin
+    6: { fruits: "Pêche, Abricot, Melon, Prune", veggies: "Tomate, Aubergine, Courgette, Concombre" }, // Juil
+    7: { fruits: "Pêche, Mirabelle, Figue, Melon", veggies: "Tomate, Aubergine, Poivron, Courgette" }, // Août
+    8: { fruits: "Raisin, Figue, Poire, Pomme", veggies: "Potiron, Champignon, Poireau, Brocoli" }, // Sept
+    9: { fruits: "Raisin, Coing, Pomme, Poire", veggies: "Courge, Châtaigne, Épinard, Champignon" }, // Oct
+    10: { fruits: "Pomme, Poire, Clémentine, Kaki", veggies: "Courge, Poireau, Endive, Chou" }, // Nov
+    11: { fruits: "Pomme, Poire, Clémentine, Kiwi", veggies: "Endive, Courge, Poireau, Chou" } // Déc
+};
+
+function getSeasonalItems() {
+    const month = new Date().getMonth();
+    return SEASON_DATA[month];
+}
 
 function getGardenMood(age, phaseFraction) {
     // Simplification pour l'algo jardinage (basé sur la position approx. dans le zodiaque lunaire via l'âge)
@@ -233,6 +254,9 @@ function updateApp() {
         els.gardenType.textContent = extra.garden.type;
         els.gardenAction.textContent = extra.garden.action;
         els.moodText.textContent = extra.mood;
+
+        const seasonal = getSeasonalItems();
+        els.seasonalText.innerHTML = `🥗 <strong>Légumes:</strong> ${seasonal.veggies}<br>🍎 <strong>Fruits:</strong> ${seasonal.fruits}`;
     }
 
     if (diffNew < diffFull) {
