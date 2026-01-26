@@ -2,8 +2,8 @@
 let state = {
     lat: 46.20,
     lon: 6.14,
-    city: "Genève",
-    country: "Suisse",
+    city: "",
+    country: "",
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
 };
 
@@ -237,9 +237,9 @@ function updateApp() {
     els.illuminationText.textContent = `${Math.round(data.illumination * 100)}% d'illumination`;
     els.moonAge.textContent = `${data.age.toFixed(1)} jours`;
 
-    // Update Header Display avec ce que l'utilisateur a tapé ou "Ma Position"
-    els.headerCity.textContent = state.city || "Ma Position";
-    els.headerCountry.textContent = state.country || "";
+    // Update Header Display avec ce que l'utilisateur a tapé ou défaut (Genève)
+    els.headerCity.textContent = state.city || "Genève";
+    els.headerCountry.textContent = state.country || "Suisse";
 
     // 2. Visual
     drawMoon(data.phaseFraction, hemisphere);
