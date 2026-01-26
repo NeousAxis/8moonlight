@@ -516,3 +516,40 @@ END:VEVENT
 
 // Init
 updateApp();
+
+// --- PWA Service Worker Registration & Auto-Update ---
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+        .then(registration => {
+            console.log('[PWA] Service Worker enregistré');
+
+            // Vérifier les mises à jour toutes les 60 secondes
+            setInterval(() => {
+                registration.update();
+            }, 60000);
+
+            // Écouter les nouveaux service workers
+            registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        // Nouvelle version disponible !
+                        if (confirm('Nouvelle version de Moonlight disponible ! Recharger maintenant ?')) {
+                            newWorker.postMessage('skipWaiting');
+                            window.location.reload();
+                        }
+                    }
+                });
+            });
+        })
+        .catch(err => console.log('[PWA] Erreur SW:', err));
+
+    // Recharger la page quand le nouveau SW prend le contrôle
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+        }
+    });
+}
