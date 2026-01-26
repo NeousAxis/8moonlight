@@ -48,7 +48,8 @@ const els = {
     gardenType: document.getElementById('gardenType'),
     gardenAction: document.getElementById('gardenAction'),
     moodText: document.getElementById('moodText'),
-    seasonalText: document.getElementById('seasonalText')
+    seasonalText: document.getElementById('seasonalText'),
+    seasonalTitle: document.getElementById('seasonalTitle')
 };
 
 // --- Constants ---
@@ -274,6 +275,9 @@ function updateApp() {
 
         const seasonal = getSeasonalItems();
         els.seasonalText.innerHTML = `🥗 <strong>Légumes:</strong> ${seasonal.veggies}<br>🍎 <strong>Fruits:</strong> ${seasonal.fruits}`;
+
+        const monthName = new Intl.DateTimeFormat('fr-FR', { month: 'long' }).format(new Date());
+        if (els.seasonalTitle) els.seasonalTitle.textContent = `De saison (${monthName})`;
     }
 
     if (diffNew < diffFull) {
