@@ -263,7 +263,73 @@ document.querySelectorAll('.toggle-switch').forEach(t => {
     t.addEventListener('click', () => t.classList.toggle('on'));
 });
 
-window.exportCalendar = () => alert("Fichier .ics généré (Simulation)");
+window.exportCalendar = () => {
+    // 1. Init ICS content
+    let startIcs = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Moonlight//NONSGML v1.0//FR
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:Phases Lunaires
+X-WR-TIMEZONE:UTC
+`;
+    let endIcs = `END:VCALENDAR`;
+    let events = "";
+
+    const now = new Date();
+    // Helper formats date to YYYYMMDDTHHmmSSZ
+    const formatICSDate = (d) => {
+        return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    };
+
+    // 2. Generate events for next 12 months (approx 25 phases)
+    let nextNew = getNextPhaseDate(0, now);
+    let nextFull = getNextPhaseDate(0.5, now);
+    let phases = [];
+
+    // Determine starting order
+    if (nextFull < nextNew) {
+        for (let i = 0; i < 25; i++) {
+            let d = new Date(nextFull.getTime() + i * (SYNODIC_MONTH / 2) * 24 * 60 * 60 * 1000);
+            phases.push({ date: d, type: i % 2 === 0 ? "Pleine Lune 🌕" : "Nouvelle Lune 🌑", desc: i % 2 === 0 ? "Illumination: 100%" : "Illumination: 0%" });
+        }
+    } else {
+        for (let i = 0; i < 25; i++) {
+            let d = new Date(nextNew.getTime() + i * (SYNODIC_MONTH / 2) * 24 * 60 * 60 * 1000);
+            phases.push({ date: d, type: i % 2 === 0 ? "Nouvelle Lune 🌑" : "Pleine Lune 🌕", desc: i % 2 === 0 ? "Illumination: 0%" : "Illumination: 100%" });
+        }
+    }
+
+    phases.forEach(p => {
+        let dtStart = formatICSDate(p.date);
+        // Event lasts 1 hour
+        let dtEnd = formatICSDate(new Date(p.date.getTime() + 60 * 60 * 1000));
+        let uid = dtStart + "-moonlight@app";
+
+        events += `BEGIN:VEVENT
+UID:${uid}
+DTSTART:${dtStart}
+DTEND:${dtEnd}
+DTSTAMP:${formatICSDate(new Date())}
+SUMMARY:${p.type}
+DESCRIPTION:${p.desc}
+STATUS:CONFIRMED
+SEQUENCE:0
+TRANSP:TRANSPARENT
+END:VEVENT
+`;
+    });
+
+    // 3. Create blob and download
+    const finalIcs = startIcs + events + endIcs;
+    const blob = new Blob([finalIcs], { type: 'text/calendar;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.setAttribute('download', 'phases_lunaires.ics');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
 
 // Init
 updateApp();
