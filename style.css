@@ -29,11 +29,12 @@ body {
 
 /* --- Header --- */
 header {
-    padding: var(--safe-area-top) 20px 10px;
+    padding: calc(15px + var(--safe-area-top)) 20px 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    z-index: 10;
+    position: relative;
+    z-index: 100;
 }
 
 .location-display {
@@ -70,7 +71,7 @@ main {
 
 .view {
     display: none;
-    padding: 10px 20px calc(80px + var(--safe-area-bottom));
+    padding: 30px 20px calc(80px + var(--safe-area-bottom));
     min-height: 100%;
     flex-direction: column;
     align-items: center;

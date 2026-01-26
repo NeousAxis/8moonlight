@@ -1,9 +1,9 @@
 // --- State (Persisté via localStorage) ---
 let state = {
-    lat: 48.85,
-    lon: 2.35,
-    city: "Ma Position",
-    country: "France",
+    lat: 46.20,
+    lon: 6.14,
+    city: "Genève",
+    country: "Suisse",
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
 };
 
@@ -97,8 +97,19 @@ const SEASON_DATA = {
     11: { fruits: "Pomme, Poire, Clémentine, Kiwi", veggies: "Endive, Courge, Poireau, Chou" } // Déc
 };
 
+const SEASON_DATA_TROPICAL = {
+    fruits: "Mangue, Banane, Fruit de la passion, Pomélo, Goyave",
+    veggies: "Liseron d'eau, Pakchoi, Bambou, Patate douce, Concombre"
+};
+
 function getSeasonalItems() {
     const month = new Date().getMonth();
+    const isTropical = (state.country && state.country.toLowerCase().includes("vietnam")) ||
+        (state.timezone && state.timezone.includes("Asia/Ho_Chi_Minh"));
+
+    if (isTropical) {
+        return SEASON_DATA_TROPICAL;
+    }
     return SEASON_DATA[month];
 }
 
