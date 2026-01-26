@@ -30,12 +30,75 @@ const els = {
     headerCountry: document.getElementById('headerCountry'),
     inputCity: document.getElementById('inputCity'),
     inputCountry: document.getElementById('inputCountry'),
-    gpsStatus: document.getElementById('gpsStatus')
+    gpsStatus: document.getElementById('gpsStatus'),
+    gardenIcon: document.getElementById('gardenIcon'),
+    gardenType: document.getElementById('gardenType'),
+    gardenAction: document.getElementById('gardenAction'),
+    moodText: document.getElementById('moodText')
 };
 
 // --- Constants ---
 const SYNODIC_MONTH = 29.53058867;
 const REFERENCE_NEW_MOON = new Date('2000-01-06T12:24:00Z');
+
+// --- Gardening & Mood Logic ---
+const GARDEN_ADVICE = {
+    root: { icon: "🥕", type: "Jour Racine", action: "Idéal pour semer/récolter carottes, radis, oignons..." },
+    leaf: { icon: "🥬", type: "Jour Feuille", action: "Occupez-vous des salades, épinards, herbes..." },
+    flower: { icon: "🌸", type: "Jour Fleur", action: "Bon pour les fleurs et légumes-fleurs (brocolis)." },
+    fruit: { icon: "🍅", type: "Jour Fruit", action: "Semis et récolte de tomates, haricots, petits fruits." },
+    rest: { icon: "⛔", type: "Repos", action: "La lune est défavorable (nœud lunaire/apogée/périgée). Reposez-vous." }
+};
+
+const MOOD_ADVICE = {
+    waxing: [ // Croissant
+        "⚡️ Énergie montante. Lancez de nouveaux projets.",
+        "💡 Votre intuition est affûtée. Écoutez-la.",
+        "🤝 Bon moment pour les rencontres et la communication.",
+        "🚀 Action ! C'est le moment de passer à l'étape supérieure."
+    ],
+    waning: [ // Décroissant
+        "🧹 Phase de nettoyage. Triez, rangez, jetez.",
+        "🧘‍♀️ Ralentissez. C'est un temps pour l'introspection.",
+        "🔋 Rechargez vos batteries. Ne commencez rien de grand.",
+        "🍂 Lâcher-prise. Acceptez ce qui se termine."
+    ],
+    new: "🌑 Nouvelle Lune : Posez vos intentions pour le cycle à venir.",
+    full: "🌕 Pleine Lune : Émotions intenses. Célébrez vos accomplissements."
+};
+
+function getGardenMood(age, phaseFraction) {
+    // Simplification pour l'algo jardinage (basé sur la position approx. dans le zodiaque lunaire via l'âge)
+    // C'est une approximation cyclique.
+    // Cycle sidéral ~27.3 jours. Zodiaque divisé en 4 trigones.
+    // Racine (Terre), Feuille (Eau), Fleur (Air), Fruit (Feu).
+    const sideralDay = (age / 27.32) * 27.32; // position approximative
+
+    // Cycle artificiel pour démo (change tous les ~2-3 jours)
+    let gardenKey = 'leaf';
+    const trigone = Math.floor(sideralDay / 2.3) % 4; // change tous les 2.3 jours
+
+    if (trigone === 0) gardenKey = 'root';
+    else if (trigone === 1) gardenKey = 'flower'; // Air ~ Fleur
+    else if (trigone === 2) gardenKey = 'leaf';  // Eau ~ Feuille
+    else gardenKey = 'fruit';
+
+    // Gestion Nœuds lunaires (Repos) - Simulation simple (tous les 14 jours)
+    if (Math.abs(age - 13.5) < 0.5 || Math.abs(age - 27) < 0.5) gardenKey = 'rest';
+
+    // Mood
+    let mood = "";
+    if (phaseFraction < 0.02 || phaseFraction > 0.98) mood = MOOD_ADVICE.new;
+    else if (phaseFraction > 0.48 && phaseFraction < 0.52) mood = MOOD_ADVICE.full;
+    else {
+        const list = (phaseFraction < 0.5) ? MOOD_ADVICE.waxing : MOOD_ADVICE.waning;
+        // Choix du message basé sur le jour du mois pour qu'il reste fixe toute la journée
+        const todayIndex = new Date().getDate() % list.length;
+        mood = list[todayIndex];
+    }
+
+    return { garden: GARDEN_ADVICE[gardenKey], mood };
+}
 
 // --- Astronomical Logic ---
 
@@ -161,6 +224,16 @@ function updateApp() {
     // Detail View
     els.moonRise.textContent = "06:" + Math.floor(6 + (data.age / SYNODIC_MONTH) * 24 % 24).toString().padStart(2, '0'); // Approx
     els.moonSet.textContent = "18:" + Math.floor(18 + (data.age / SYNODIC_MONTH) * 24 % 24).toString().padStart(2, '0'); // Approx
+
+    // --- NEW: Garden & Mood Logic ---
+    const extra = getGardenMood(data.age, data.phaseFraction);
+
+    if (els.gardenIcon) { // Check if elements exist
+        els.gardenIcon.textContent = extra.garden.icon;
+        els.gardenType.textContent = extra.garden.type;
+        els.gardenAction.textContent = extra.garden.action;
+        els.moodText.textContent = extra.mood;
+    }
 
     if (diffNew < diffFull) {
         els.nextPhaseName.textContent = `Nouvelle Lune (${formatLocal(nextNew, tz)})`;
