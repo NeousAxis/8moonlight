@@ -1,10 +1,11 @@
 // --- State (Persisté via localStorage) ---
 let state = {
-    lat: 46.20,
-    lon: 6.14,
+    lat: null,
+    lon: null,
     city: "",
     country: "",
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    hasLocation: false // FLAG pour savoir si la localisation est confirmée
 };
 
 function loadState() {
@@ -237,12 +238,9 @@ function updateApp() {
     els.illuminationText.textContent = `${Math.round(data.illumination * 100)}% d'illumination`;
     els.moonAge.textContent = `${data.age.toFixed(1)} jours`;
 
-    // Display: Priorité au state utilisateur, sinon fallback Genève
-    const displayCity = state.city || (state.lat === 46.20 && state.lon === 6.14 ? "Genève" : "Ma Position");
-    const displayCountry = state.country || (state.lat === 46.20 && state.lon === 6.14 ? "Suisse" : "");
-
-    els.headerCity.textContent = displayCity;
-    els.headerCountry.textContent = displayCountry;
+    // Display: Priorité au state utilisateur, sinon fallback générique
+    els.headerCity.textContent = state.city || "Ville";
+    els.headerCountry.textContent = state.country || "Pays";
 
     // 2. Visual
     drawMoon(data.phaseFraction, hemisphere);
@@ -278,10 +276,10 @@ function updateApp() {
     els.moonRise.textContent = "06:" + Math.floor(6 + (data.age / SYNODIC_MONTH) * 24 % 24).toString().padStart(2, '0'); // Approx
     els.moonSet.textContent = "18:" + Math.floor(18 + (data.age / SYNODIC_MONTH) * 24 % 24).toString().padStart(2, '0'); // Approx
 
-    // --- NEW: Garden & Mood Logic ---
-    const extra = getGardenMood(data.age, data.phaseFraction);
+    // --- NEW: Garden & Mood Logic (UNIQUEMENT si localisation confirmée) ---
+    if (state.hasLocation && els.gardenIcon) {
+        const extra = getGardenMood(data.age, data.phaseFraction);
 
-    if (els.gardenIcon) { // Check if elements exist
         els.gardenIcon.textContent = extra.garden.icon;
         els.gardenType.textContent = extra.garden.type;
         els.gardenAction.textContent = extra.garden.action;
@@ -292,6 +290,14 @@ function updateApp() {
 
         const monthName = new Intl.DateTimeFormat('fr-FR', { month: 'long' }).format(new Date());
         if (els.seasonalTitle) els.seasonalTitle.textContent = `De saison (${monthName})`;
+    } else if (els.gardenIcon) {
+        // Pas de localisation, on affiche un message d'invitation
+        els.gardenIcon.textContent = "🌍";
+        els.gardenType.textContent = "Localisation requise";
+        els.gardenAction.textContent = "Rendez-vous dans Réglages pour indiquer votre position.";
+        els.moodText.textContent = "Indiquez votre localisation pour obtenir un conseil.";
+        els.seasonalText.textContent = "Indiquez votre localisation pour voir les produits de saison.";
+        if (els.seasonalTitle) els.seasonalTitle.textContent = "De saison";
     }
 
     if (diffNew < diffFull) {
@@ -361,39 +367,48 @@ document.getElementById('btnGps').addEventListener('click', () => {
             // Mise à jour des coordonnées réelles
             state.lat = pos.coords.latitude;
             state.lon = pos.coords.longitude;
-            state.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone; // Mise à jour fuseau auto
+            state.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            state.hasLocation = true; // Marquer la localisation comme confirmée
 
             // Feedback utilisateur
             els.gpsStatus.textContent = "Recherche du nom de la ville...";
             els.gpsStatus.style.color = "var(--accent)";
 
-            // Reverse Geocoding (Gratuit via Nominatim OpenStreetMap)
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${state.lat}&lon=${state.lon}&accept-language=fr`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data && data.address) {
-                        const addr = data.address;
-                        // Priorité : Ville réelle > Ville > Province (pour les villes à statut spécial comme Da Nang) > District
-                        state.city = addr.city || addr.town || addr.state || addr.province || addr.municipality || addr.village || "Position GPS";
-                        state.country = addr.country || "";
+            // Reverse Geocoding UNIQUEMENT si l'utilisateur n'a pas déjà saisi une ville
+            if (!state.city || state.city === "") {
+                fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${state.lat}&lon=${state.lon}&accept-language=fr`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data && data.address) {
+                            const addr = data.address;
+                            // Priorité : Ville réelle > Province > District (pour les villes à statut spécial comme Da Nang)
+                            let cityName = addr.city || addr.town || addr.state || addr.province || addr.municipality || addr.village || "Position GPS";
 
-                        // Nettoyage spécifique pour le Vietnam (on veut Da Nang, pas le quartier/phường)
-                        if (state.city.includes("Phường") || state.city.includes("Huyện")) {
-                            if (addr.state || addr.province) state.city = addr.state || addr.province;
+                            // Nettoyage spécifique pour le Vietnam
+                            if (cityName.includes("Ph\u01b0\u1eddng") || cityName.includes("Huy\u1ec7n")) {
+                                cityName = addr.state || addr.province || cityName;
+                            }
+
+                            state.city = cityName;
+                            state.country = addr.country || "";
+                            els.gpsStatus.textContent = `Position : ${state.city}`;
+                        } else {
+                            els.gpsStatus.textContent = "Position trouvée !";
                         }
-
-                        els.gpsStatus.textContent = `Position : ${state.city}`;
-                    } else {
-                        els.gpsStatus.textContent = "Position trouvée (nom inconnu)";
-                    }
-                    saveState();
-                    updateApp();
-                })
-                .catch(() => {
-                    els.gpsStatus.textContent = "Position trouvée !";
-                    saveState();
-                    updateApp();
-                });
+                        saveState();
+                        updateApp();
+                    })
+                    .catch(() => {
+                        els.gpsStatus.textContent = "Position trouvée !";
+                        saveState();
+                        updateApp();
+                    });
+            } else {
+                // L'utilisateur a déjà saisi une ville, on la garde
+                els.gpsStatus.textContent = `Position validée pour ${state.city}`;
+                saveState();
+                updateApp();
+            }
         }, () => {
             els.gpsStatus.textContent = "Erreur GPS / Refus permission.";
             els.gpsStatus.style.color = "red";
