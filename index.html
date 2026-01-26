@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Moonlight</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <header>
+        <button class="location-display" id="headerLocation">
+            <div id="headerCity">Ma Position</div>
+            <div id="headerCountry" class="location-sub">--</div>
+        </button>
+    </header>
+
+    <main>
+        <!-- HOME VIEW -->
+        <section id="view-home" class="view active">
+            <div class="moon-container">
+                <svg id="moon-svg" viewBox="0 0 100 100">
+                    <circle id="moon-bg" cx="50" cy="50" r="48" />
+                    <path id="moon-path" d="" />
+                </svg>
+            </div>
+
+            <h1 class="phase-name" id="phaseName">Chargement...</h1>
+            <div class="illumination" id="illuminationText">--%</div>
+
+            <div class="cycle-container">
+                <div class="cycle-labels">
+                    <span>Nouvelle Lune</span>
+                    <span>Pleine Lune</span>
+                    <span>Nouvelle</span>
+                </div>
+                <div class="progress-track">
+                    <div class="progress-fill" id="progressFill"></div>
+                    <div class="progress-marker" id="progressMarker"></div>
+                </div>
+            </div>
+
+            <div class="cards-grid">
+                <div class="card">
+                    <span class="card-label">Prochaine Nouvelle Lune</span>
+                    <span class="card-value" id="nextNewDate">--</span>
+                    <span class="card-label countdown-value" id="nextNewCountdown">--</span>
+                </div>
+                <div class="card">
+                    <span class="card-label">Prochaine Pleine Lune</span>
+                    <span class="card-value" id="nextFullDate">--</span>
+                    <span class="card-label countdown-value" id="nextFullCountdown">--</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- DETAILS VIEW -->
+        <section id="view-details" class="view">
+            <h2 style="margin-bottom:20px; font-weight:300;">Détails du jour</h2>
+
+            <div class="cards-grid" style="margin-bottom:30px;">
+                <div class="card" style="padding: 15px;">
+                    <div class="detail-row">
+                        <span class="detail-label">Lever</span>
+                        <span class="detail-data" id="moonRise">--:--</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Coucher</span>
+                        <span class="detail-data" id="moonSet">--:--</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Âge</span>
+                        <span class="detail-data" id="moonAge">-- jours</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Prochaine phase</span>
+                        <span class="detail-data" id="nextPhaseName">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <h3 class="settings-title">6 Prochaines Phases</h3>
+            <div class="phase-list" id="upcomingPhasesList"></div>
+        </section>
+
+        <!-- SETTINGS / WIDGET VIEW -->
+        <section id="view-settings" class="view">
+            <h2 style="margin-bottom:20px; font-weight:300;">Paramètres</h2>
+
+            <!-- 2 Champs Ville / Pays demandés -->
+            <div class="settings-group">
+                <h3 class="settings-title">Localisation</h3>
+
+                <div class="input-group">
+                    <label>Ville</label>
+                    <input type="text" id="inputCity" class="text-input" placeholder="Ex: Paris">
+                </div>
+
+                <div class="input-group">
+                    <label>Pays</label>
+                    <input type="text" id="inputCountry" class="text-input" placeholder="Ex: France">
+                </div>
+
+                <!-- Bouton GPS demandé -->
+                <button class="btn-action" id="btnGps" style="background: rgba(220, 220, 220, 0.15);">
+                    <svg class="nav-icon" style="width:20px;height:20px;" viewBox="0 0 24 24">
+                        <path
+                            d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
+                    </svg>
+                    Utiliser ma position GPS
+                </button>
+                <div id="gpsStatus"
+                    style="font-size:0.8rem; color:var(--text-secondary); margin-top:10px; text-align:center;"></div>
+            </div>
+
+            <div class="settings-group">
+                <h3 class="settings-title">Notifications</h3>
+
+                <div class="toggle-row">
+                    <span>Pleine Lune</span>
+                    <div class="toggle-switch on"></div>
+                </div>
+
+                <div class="toggle-row">
+                    <span>Nouvelle Lune</span>
+                    <div class="toggle-switch"></div>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <h3 class="settings-title">Export Calendrier</h3>
+                <button class="btn-action" onclick="exportCalendar()">
+                    <svg class="nav-icon" style="width:20px;height:20px;" viewBox="0 0 24 24">
+                        <path
+                            d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z" />
+                    </svg>
+                    Ajouter au calendrier (12 mois)
+                </button>
+            </div>
+
+            <div class="settings-group">
+                <h3 class="settings-title">Aperçu Widget</h3>
+                <div class="widget-preview">
+                    <div class="widget-moon" id="widget-moon-icon"></div>
+                    <div class="widget-info">
+                        <div id="widget-illum">0%</div>
+                        <strong id="widget-countdown">J-3 Pleine Lune</strong>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <nav>
+        <button class="nav-item active" data-target="view-home">
+            <svg class="nav-icon" viewBox="0 0 24 24">
+                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+            </svg>
+            Lune
+        </button>
+        <button class="nav-item" data-target="view-details">
+            <svg class="nav-icon" viewBox="0 0 24 24">
+                <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" />
+            </svg>
+            Détails
+        </button>
+        <button class="nav-item" data-target="view-settings">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="1"></circle>
+                <circle cx="12" cy="5" r="1"></circle>
+                <circle cx="12" cy="19" r="1"></circle>
+            </svg>
+            Réglages
+        </button>
+    </nav>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
