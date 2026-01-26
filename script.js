@@ -1,11 +1,24 @@
-// --- State (Basé sur GPS) ---
+// --- State (Persisté via localStorage) ---
 let state = {
-    lat: 48.85, // Défaut (Paris)
+    lat: 48.85,
     lon: 2.35,
     city: "Ma Position",
     country: "France",
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone // Auto-detect fuseau horaire navigateur
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
 };
+
+function loadState() {
+    const saved = localStorage.getItem('moonlight_state');
+    if (saved) {
+        state = JSON.parse(saved);
+    }
+}
+
+function saveState() {
+    localStorage.setItem('moonlight_state', JSON.stringify(state));
+}
+
+loadState();
 
 // DOM Elements
 const els = {
@@ -221,10 +234,14 @@ function updateApp() {
 
     // 3. Progress
     const pct = (data.phaseFraction * 100).toFixed(1);
-    els.progressFill.style.width = `${pct}%`;
-    els.progressMarker.style.left = `${pct}%`;
+    if (els.progressFill) els.progressFill.style.width = `${pct}%`;
+    if (els.progressMarker) els.progressMarker.style.left = `${pct}%`;
 
-    // 4. Next Phases
+    // 4. Input Sync (pour garder les champs à jour avec le state)
+    if (els.inputCity && document.activeElement !== els.inputCity) els.inputCity.value = state.city || "";
+    if (els.inputCountry && document.activeElement !== els.inputCountry) els.inputCountry.value = state.country || "";
+
+    // 5. Next Phases
     const nextNew = getNextPhaseDate(0, now);
     const nextFull = getNextPhaseDate(0.5, now);
 
@@ -308,11 +325,13 @@ function generateUpcomingList(now, tz) {
 // Mise à jour de l'état quand l'utilisateur tape dans les champs
 els.inputCity.addEventListener('input', (e) => {
     state.city = e.target.value;
+    saveState();
     updateApp();
 });
 
 els.inputCountry.addEventListener('input', (e) => {
     state.country = e.target.value;
+    saveState();
     updateApp();
 });
 
@@ -333,8 +352,10 @@ document.getElementById('btnGps').addEventListener('click', () => {
             // On vide les champs texte pour laisser l'utilisateur écrire ce qu'il veut,
             // ou on peut mettre un message générique.
             // Ici, on force "Ma Position" dans la variable state si vide
-            if (!state.city) state.city = "Ma Position";
+            state.city = "Ma Position";
+            state.country = "";
 
+            saveState();
             updateApp();
         }, () => {
             els.gpsStatus.textContent = "Erreur GPS / Refus permission.";

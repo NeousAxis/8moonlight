@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Moonlight</title>
-    <link rel="stylesheet" href="style.css?v=1.1">
+    <link rel="stylesheet" href="style.css?v=1.2">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -57,30 +57,32 @@
                     <span class="card-value" id="nextFullDate">--</span>
                     <span class="card-label countdown-value" id="nextFullCountdown">--</span>
                 </div>
-            </div>
 
-            <!-- JARDIN CARD -->
-            <div class="card" style="margin-top: 15px; padding: 15px; border-left: 4px solid #4CAF50;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <span class="card-label" style="color:#4CAF50;">Jardinage</span>
-                    <span id="gardenIcon" style="font-size:1.5rem;">🌱</span>
+                <!-- JARDIN CARD -->
+                <div class="card" style="border-left: 4px solid #4CAF50;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <span class="card-label" style="color:#4CAF50;">Jardinage</span>
+                        <span id="gardenIcon" style="font-size:1.5rem;">🌱</span>
+                    </div>
+                    <div id="gardenType" style="font-size:1.1rem; font-weight:600; margin-bottom:5px;">--</div>
+                    <div id="gardenAction" style="font-size:0.9rem; color:var(--text-secondary); line-height:1.4;">--
+                    </div>
                 </div>
-                <div id="gardenType" style="font-size:1.1rem; font-weight:600; margin-bottom:5px;">--</div>
-                <div id="gardenAction" style="font-size:0.9rem; color:var(--text-secondary); line-height:1.4;">--</div>
-            </div>
 
-            <!-- MOOD CARD -->
-            <div class="card" style="margin-top: 15px; padding: 15px; border-left: 4px solid #9C27B0;">
-                <span class="card-label" style="color:#9C27B0; margin-bottom:10px; display:block;">Énergie du
-                    jour</span>
-                <div id="moodText" style="font-size:0.95rem; line-height:1.5; font-style:italic;">--</div>
-            </div>
+                <!-- MOOD CARD -->
+                <div class="card" style="border-left: 4px solid #9C27B0;">
+                    <span class="card-label" style="color:#9C27B0; margin-bottom:10px; display:block;">Énergie du
+                        jour</span>
+                    <div id="moodText" style="font-size:0.95rem; line-height:1.5; font-style:italic;">--</div>
+                </div>
 
-            <!-- SEASONAL CARD -->
-            <div class="card" style="margin-top: 15px; padding: 15px; border-left: 4px solid #FF9800;">
-                <span class="card-label" style="color:#FF9800; margin-bottom:10px; display:block;">De saison
-                    (Janvier)</span>
-                <div id="seasonalText" style="font-size:0.85rem; line-height:1.6; color:var(--text-secondary);">--</div>
+                <!-- SEASONAL CARD -->
+                <div class="card" style="border-left: 4px solid #FF9800;">
+                    <span class="card-label" style="color:#FF9800; margin-bottom:10px; display:block;">De saison
+                        (Janvier)</span>
+                    <div id="seasonalText" style="font-size:0.85rem; line-height:1.6; color:var(--text-secondary);">--
+                    </div>
+                </div>
             </div>
         </section>
 
