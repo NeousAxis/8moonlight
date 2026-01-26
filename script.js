@@ -361,17 +361,33 @@ document.getElementById('btnGps').addEventListener('click', () => {
             state.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone; // Mise à jour fuseau auto
 
             // Feedback utilisateur
-            els.gpsStatus.textContent = "Position trouvée !";
+            els.gpsStatus.textContent = "Recherche du nom de la ville...";
             els.gpsStatus.style.color = "var(--accent)";
 
-            // On vide les champs texte pour laisser l'utilisateur écrire ce qu'il veut,
-            // ou on peut mettre un message générique.
-            // Ici, on force "Ma Position" dans la variable state si vide
-            state.city = "Ma Position";
-            state.country = "";
-
-            saveState();
-            updateApp();
+            // Reverse Geocoding (Gratuit via Nominatim OpenStreetMap)
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${state.lat}&lon=${state.lon}&accept-language=fr`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.address) {
+                        const addr = data.address;
+                        state.city = addr.city || addr.town || addr.village || addr.municipality || addr.hamlet || "Ma Position";
+                        state.country = addr.country || "";
+                        els.gpsStatus.textContent = `Position trouvée : ${state.city}`;
+                    } else {
+                        state.city = "Ma Position";
+                        state.country = "";
+                        els.gpsStatus.textContent = "Position trouvée !";
+                    }
+                    saveState();
+                    updateApp();
+                })
+                .catch(() => {
+                    state.city = "Ma Position";
+                    state.country = "";
+                    saveState();
+                    updateApp();
+                    els.gpsStatus.textContent = "Position trouvée !";
+                });
         }, () => {
             els.gpsStatus.textContent = "Erreur GPS / Refus permission.";
             els.gpsStatus.style.color = "red";
