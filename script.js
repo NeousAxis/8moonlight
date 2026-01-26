@@ -272,6 +272,19 @@ function updateApp() {
     els.nextNewCountdown.textContent = `Dans ${daysN}j ${hrsN}h`;
     els.nextFullCountdown.textContent = `Dans ${daysF}j ${hrsF}h`;
 
+    // Réordonner les cartes pour que l'événement le plus proche soit en premier
+    const cardNew = document.getElementById('cardNewMoon');
+    const cardFull = document.getElementById('cardFullMoon');
+    if (cardNew && cardFull && cardNew.parentNode) {
+        if (diffFull < diffNew) {
+            // Pleine Lune plus proche, la mettre en premier
+            cardNew.parentNode.insertBefore(cardFull, cardNew);
+        } else {
+            // Nouvelle Lune plus proche, la mettre en premier
+            cardNew.parentNode.insertBefore(cardNew, cardFull);
+        }
+    }
+
     // Detail View
     els.moonRise.textContent = "06:" + Math.floor(6 + (data.age / SYNODIC_MONTH) * 24 % 24).toString().padStart(2, '0'); // Approx
     els.moonSet.textContent = "18:" + Math.floor(18 + (data.age / SYNODIC_MONTH) * 24 % 24).toString().padStart(2, '0'); // Approx

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Moonlight</title>
-    <link rel="stylesheet" href="style.css?v=2.1">
+    <link rel="stylesheet" href="style.css?v=2.2">
     <link rel="icon" type="image/png" href="icon-192.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
@@ -49,13 +49,13 @@
             </div>
 
             <div class="cards-grid">
-                <div class="card">
-                    <span class="card-label">Prochaine Nouvelle Lune</span>
+                <div class="card" id="cardNewMoon">
+                    <span class="card-label" id="labelNewMoon">Prochaine Nouvelle Lune</span>
                     <span class="card-value" id="nextNewDate">--</span>
                     <span class="card-label countdown-value" id="nextNewCountdown">--</span>
                 </div>
-                <div class="card">
-                    <span class="card-label">Prochaine Pleine Lune</span>
+                <div class="card" id="cardFullMoon">
+                    <span class="card-label" id="labelFullMoon">Prochaine Pleine Lune</span>
                     <span class="card-value" id="nextFullDate">--</span>
                     <span class="card-label countdown-value" id="nextFullCountdown">--</span>
                 </div>
@@ -209,7 +209,7 @@
         </button>
     </nav>
 
-    <script src="script.js?v=2.1"></script>
+    <script src="script.js?v=2.2"></script>
 </body>
 
 </html>
