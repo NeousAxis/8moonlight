@@ -5,7 +5,8 @@ let state = {
     city: "",
     country: "",
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    hasLocation: false // FLAG pour savoir si la localisation est confirmée
+    hasLocation: false, // FLAG pour savoir si la localisation est confirmée
+    isManual: false // FLAG pour savoir si l'utilisateur a saisi manuellement la ville
 };
 
 function loadState() {
@@ -362,12 +363,14 @@ function generateUpcomingList(now, tz) {
 // Mise à jour de l'état quand l'utilisateur tape dans les champs
 els.inputCity.addEventListener('input', (e) => {
     state.city = e.target.value;
+    state.isManual = (state.city !== "");
     saveState();
     updateApp();
 });
 
 els.inputCountry.addEventListener('input', (e) => {
     state.country = e.target.value;
+    state.isManual = (state.city !== "" || state.country !== "");
     saveState();
     updateApp();
 });
@@ -387,9 +390,11 @@ document.getElementById('btnGps').addEventListener('click', () => {
             els.gpsStatus.textContent = "Recherche du nom de la ville...";
             els.gpsStatus.style.color = "var(--accent)";
 
-            // Reverse Geocoding UNIQUEMENT si l'utilisateur n'a pas déjà saisi une ville
-            if (!state.city || state.city === "") {
-                fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${state.lat}&lon=${state.lon}&accept-language=fr`)
+            // Reverse Geocoding : Si l'utilisateur n'a pas SAISI manuellement une ville, ou s'il demande explicitement via le bouton GPS
+            // On considère que cliquer sur le bouton GPS veut dire "Mets à jour ma ville actuelle"
+            state.isManual = false; 
+            
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${state.lat}&lon=${state.lon}&accept-language=fr`)
                     .then(res => res.json())
                     .then(data => {
                         if (data && data.address) {
@@ -416,12 +421,6 @@ document.getElementById('btnGps').addEventListener('click', () => {
                         saveState();
                         updateApp();
                     });
-            } else {
-                // L'utilisateur a déjà saisi une ville, on la garde
-                els.gpsStatus.textContent = `Position validée pour ${state.city}`;
-                saveState();
-                updateApp();
-            }
         }, () => {
             els.gpsStatus.textContent = "Erreur GPS / Refus permission.";
             els.gpsStatus.style.color = "red";
@@ -516,6 +515,30 @@ END:VEVENT
 
 // Init
 updateApp();
+
+// Tenter une mise à jour silencieuse de la position au démarrage si déjà autorisé
+if ('geolocation' in navigator && state.hasLocation && !state.isManual) {
+    navigator.geolocation.getCurrentPosition((pos) => {
+        state.lat = pos.coords.latitude;
+        state.lon = pos.coords.longitude;
+        // On rafraîchit le nom de la ville uniquement si ce n'est pas manuel
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${state.lat}&lon=${state.lon}&accept-language=fr`)
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.address) {
+                    const addr = data.address;
+                    let cityName = addr.city || addr.town || addr.state || addr.province || addr.municipality || addr.village || "Position GPS";
+                    if (cityName.includes("Ph\u01b0\u1eddng") || cityName.includes("Huy\u1ec7n")) {
+                        cityName = addr.state || addr.province || cityName;
+                    }
+                    state.city = cityName;
+                    state.country = addr.country || "";
+                    saveState();
+                    updateApp();
+                }
+            }).catch(() => {});
+    }, () => {}, { timeout: 5000 });
+}
 
 // --- PWA Service Worker Registration & Auto-Update ---
 if ('serviceWorker' in navigator) {
