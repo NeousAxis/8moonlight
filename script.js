@@ -392,35 +392,35 @@ document.getElementById('btnGps').addEventListener('click', () => {
 
             // Reverse Geocoding : Si l'utilisateur n'a pas SAISI manuellement une ville, ou s'il demande explicitement via le bouton GPS
             // On considère que cliquer sur le bouton GPS veut dire "Mets à jour ma ville actuelle"
-            state.isManual = false; 
-            
+            state.isManual = false;
+
             fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${state.lat}&lon=${state.lon}&accept-language=fr`)
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data && data.address) {
-                            const addr = data.address;
-                            // Priorité : Ville réelle > Province > District (pour les villes à statut spécial comme Da Nang)
-                            let cityName = addr.city || addr.town || addr.state || addr.province || addr.municipality || addr.village || "Position GPS";
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.address) {
+                        const addr = data.address;
+                        // Priorité : Ville réelle > Province > District (pour les villes à statut spécial comme Da Nang)
+                        let cityName = addr.city || addr.town || addr.state || addr.province || addr.municipality || addr.village || "Position GPS";
 
-                            // Nettoyage spécifique pour le Vietnam
-                            if (cityName.includes("Ph\u01b0\u1eddng") || cityName.includes("Huy\u1ec7n")) {
-                                cityName = addr.state || addr.province || cityName;
-                            }
-
-                            state.city = cityName;
-                            state.country = addr.country || "";
-                            els.gpsStatus.textContent = `Position : ${state.city}`;
-                        } else {
-                            els.gpsStatus.textContent = "Position trouvée !";
+                        // Nettoyage spécifique pour le Vietnam
+                        if (cityName.includes("Ph\u01b0\u1eddng") || cityName.includes("Huy\u1ec7n")) {
+                            cityName = addr.state || addr.province || cityName;
                         }
-                        saveState();
-                        updateApp();
-                    })
-                    .catch(() => {
+
+                        state.city = cityName;
+                        state.country = addr.country || "";
+                        els.gpsStatus.textContent = `Position : ${state.city}`;
+                    } else {
                         els.gpsStatus.textContent = "Position trouvée !";
-                        saveState();
-                        updateApp();
-                    });
+                    }
+                    saveState();
+                    updateApp();
+                })
+                .catch(() => {
+                    els.gpsStatus.textContent = "Position trouvée !";
+                    saveState();
+                    updateApp();
+                });
         }, () => {
             els.gpsStatus.textContent = "Erreur GPS / Refus permission.";
             els.gpsStatus.style.color = "red";
@@ -441,8 +441,50 @@ document.querySelectorAll('.nav-item').forEach(item => {
 });
 
 
+// --- Toggle Persistence ---
+const toggleFullMoon = document.getElementById('toggleFullMoon');
+const toggleNewMoon = document.getElementById('toggleNewMoon');
+
+// Load saved toggle states
+function loadToggleStates() {
+    const saved = localStorage.getItem('moonlight_toggles');
+    if (saved) {
+        const toggles = JSON.parse(saved);
+        if (toggleFullMoon) {
+            if (toggles.fullMoon) {
+                toggleFullMoon.classList.add('on');
+            } else {
+                toggleFullMoon.classList.remove('on');
+            }
+        }
+        if (toggleNewMoon) {
+            if (toggles.newMoon) {
+                toggleNewMoon.classList.add('on');
+            } else {
+                toggleNewMoon.classList.remove('on');
+            }
+        }
+    }
+}
+
+// Save toggle states
+function saveToggleStates() {
+    const toggles = {
+        fullMoon: toggleFullMoon ? toggleFullMoon.classList.contains('on') : true,
+        newMoon: toggleNewMoon ? toggleNewMoon.classList.contains('on') : false
+    };
+    localStorage.setItem('moonlight_toggles', JSON.stringify(toggles));
+}
+
+// Initialize toggles from localStorage
+loadToggleStates();
+
+// Add click handlers with persistence
 document.querySelectorAll('.toggle-switch').forEach(t => {
-    t.addEventListener('click', () => t.classList.toggle('on'));
+    t.addEventListener('click', () => {
+        t.classList.toggle('on');
+        saveToggleStates();
+    });
 });
 
 window.exportCalendar = () => {
@@ -536,8 +578,8 @@ if ('geolocation' in navigator && state.hasLocation && !state.isManual) {
                     saveState();
                     updateApp();
                 }
-            }).catch(() => {});
-    }, () => {}, { timeout: 5000 });
+            }).catch(() => { });
+    }, () => { }, { timeout: 5000 });
 }
 
 // --- PWA Service Worker Registration & Auto-Update ---
