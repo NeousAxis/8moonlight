@@ -148,16 +148,41 @@
             </div>
 
             <div class="settings-group">
-                <h3 class="settings-title">Notifications</h3>
+                <h3 class="settings-title">Notifications & Rappels</h3>
+
+                <button class="btn-action" id="btnRequestNotifications" style="margin-bottom:15px; background: rgba(0, 150, 255, 0.15);">
+                    Autoriser les notifications
+                </button>
 
                 <div class="toggle-row">
-                    <span>Pleine Lune</span>
+                    <span>Pleine Lune (Rappels)</span>
                     <div class="toggle-switch on" id="toggleFullMoon"></div>
                 </div>
 
                 <div class="toggle-row">
-                    <span>Nouvelle Lune</span>
+                    <span>Nouvelle Lune (Rappels)</span>
                     <div class="toggle-switch" id="toggleNewMoon"></div>
+                </div>
+
+                <div class="reminder-options" style="margin-top: 10px; padding-left: 10px; border-left: 2px solid rgba(255,255,255,0.1);">
+                    <div class="toggle-row">
+                        <span>3 jours avant</span>
+                        <div class="toggle-switch" id="toggleRem3d"></div>
+                    </div>
+                    <div class="toggle-row">
+                        <span>1 jour avant</span>
+                        <div class="toggle-switch" id="toggleRem1d"></div>
+                    </div>
+                    <div class="toggle-row">
+                        <span>Le jour J (1h ou 8h avant)</span>
+                        <div class="toggle-switch on" id="toggleRemDay"></div>
+                    </div>
+                </div>
+
+                <h4 style="margin:20px 0 10px; font-size:0.9rem; font-weight:400; color:var(--text-secondary);">Phases & Énergie</h4>
+                <div class="toggle-row">
+                    <span>Annonce des phases & Énergie</span>
+                    <div class="toggle-switch" id="togglePhaseAnnonce"></div>
                 </div>
             </div>
 

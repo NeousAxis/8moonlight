@@ -115,7 +115,7 @@ function getSeasonalItems() {
     return SEASON_DATA[month];
 }
 
-function getGardenMood(age, phaseFraction) {
+function getGardenMood(age, phaseFraction, targetDate = new Date()) {
     // Simplification pour l'algo jardinage (basé sur la position approx. dans le zodiaque lunaire via l'âge)
     // C'est une approximation cyclique.
     // Cycle sidéral ~27.3 jours. Zodiaque divisé en 4 trigones.
@@ -141,8 +141,8 @@ function getGardenMood(age, phaseFraction) {
     else {
         const list = (phaseFraction < 0.5) ? MOOD_ADVICE.waxing : MOOD_ADVICE.waning;
         // Choix du message basé sur le jour du mois pour qu'il reste fixe toute la journée
-        const todayIndex = new Date().getDate() % list.length;
-        mood = list[todayIndex];
+        const targetIndex = targetDate.getDate() % list.length;
+        mood = list[targetIndex];
     }
 
     return { garden: GARDEN_ADVICE[gardenKey], mood };
@@ -292,7 +292,7 @@ function updateApp() {
 
     // --- NEW: Garden & Mood Logic (UNIQUEMENT si localisation confirmée) ---
     if (state.hasLocation && els.gardenIcon) {
-        const extra = getGardenMood(data.age, data.phaseFraction);
+        const extra = getGardenMood(data.age, data.phaseFraction, now);
 
         els.gardenIcon.textContent = extra.garden.icon;
         els.gardenType.textContent = extra.garden.type;
@@ -442,26 +442,38 @@ document.querySelectorAll('.nav-item').forEach(item => {
 
 
 // --- Toggle Persistence ---
-const toggleFullMoon = document.getElementById('toggleFullMoon');
-const toggleNewMoon = document.getElementById('toggleNewMoon');
+const uiToggles = {
+    fullMoon: document.getElementById('toggleFullMoon'),
+    newMoon: document.getElementById('toggleNewMoon'),
+    rem3d: document.getElementById('toggleRem3d'),
+    rem1d: document.getElementById('toggleRem1d'),
+    remDay: document.getElementById('toggleRemDay'),
+    phaseAnnonce: document.getElementById('togglePhaseAnnonce')
+};
+
+let notificationSettings = {
+    fullMoon: true,
+    newMoon: false,
+    rem3d: false,
+    rem1d: false,
+    remDay: true,
+    phaseAnnonce: false
+};
 
 // Load saved toggle states
 function loadToggleStates() {
     const saved = localStorage.getItem('moonlight_toggles');
     if (saved) {
-        const toggles = JSON.parse(saved);
-        if (toggleFullMoon) {
-            if (toggles.fullMoon) {
-                toggleFullMoon.classList.add('on');
+        // Fallback for previous structure
+        const parsed = JSON.parse(saved);
+        notificationSettings = { ...notificationSettings, ...parsed };
+    }
+    for (const [key, element] of Object.entries(uiToggles)) {
+        if (element) {
+            if (notificationSettings[key]) {
+                element.classList.add('on');
             } else {
-                toggleFullMoon.classList.remove('on');
-            }
-        }
-        if (toggleNewMoon) {
-            if (toggles.newMoon) {
-                toggleNewMoon.classList.add('on');
-            } else {
-                toggleNewMoon.classList.remove('on');
+                element.classList.remove('on');
             }
         }
     }
@@ -469,11 +481,13 @@ function loadToggleStates() {
 
 // Save toggle states
 function saveToggleStates() {
-    const toggles = {
-        fullMoon: toggleFullMoon ? toggleFullMoon.classList.contains('on') : true,
-        newMoon: toggleNewMoon ? toggleNewMoon.classList.contains('on') : false
-    };
-    localStorage.setItem('moonlight_toggles', JSON.stringify(toggles));
+    for (const [key, element] of Object.entries(uiToggles)) {
+        if (element) {
+            notificationSettings[key] = element.classList.contains('on');
+        }
+    }
+    localStorage.setItem('moonlight_toggles', JSON.stringify(notificationSettings));
+    scheduleAllNotifications();
 }
 
 // Initialize toggles from localStorage
@@ -486,6 +500,153 @@ document.querySelectorAll('.toggle-switch').forEach(t => {
         saveToggleStates();
     });
 });
+
+// --- Notifications Logic ---
+
+const btnRequestNotifications = document.getElementById('btnRequestNotifications');
+if (btnRequestNotifications) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+        btnRequestNotifications.textContent = "Notifications activées ✓";
+        btnRequestNotifications.disabled = true;
+        btnRequestNotifications.style.opacity = '0.7';
+    }
+
+    btnRequestNotifications.addEventListener('click', async () => {
+        if (!('Notification' in window)) {
+            alert("Les notifications ne sont pas supportées par ce navigateur.");
+            return;
+        }
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+            btnRequestNotifications.textContent = "Notifications activées ✓";
+            btnRequestNotifications.disabled = true;
+            btnRequestNotifications.style.opacity = '0.7';
+            scheduleAllNotifications();
+        }
+    });
+}
+
+async function scheduleNotification(title, body, date, tag) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    if (date.getTime() < Date.now()) return; // Passée
+
+    if (!('serviceWorker' in navigator)) return;
+    const registration = await navigator.serviceWorker.ready;
+
+    // Utilisation de Notification Triggers API si supportée (Chrome Android)
+    if ('showTrigger' in Notification.prototype) {
+        registration.showNotification(title, {
+            body: body,
+            icon: '/icon-192.png',
+            tag: tag,
+            showTrigger: new TimestampTrigger(date.getTime())
+        });
+    } else {
+        // Fallback pour les navigateurs non supportés : 
+        // On schedule juste par timeout si l'app est ouverte (et si < 24h)
+        const delay = date.getTime() - Date.now();
+        if (delay > 0 && delay < 86400000) {
+            setTimeout(() => {
+                registration.showNotification(title, {
+                    body: body,
+                    icon: '/icon-192.png',
+                    tag: tag
+                });
+            }, delay);
+        }
+    }
+}
+
+async function scheduleAllNotifications() {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+    // Ferme toutes les notifications existantes qui seraient planifiées ?
+    // L'API actuelle overwrite si on utilise le même tag.
+
+    const now = new Date();
+    let nextNew = getNextPhaseDate(0, now);
+    let nextFull = getNextPhaseDate(0.5, now);
+    let phases = [];
+    
+    // Prochaines ~2 mois (4 événements majeurs)
+    if (nextFull < nextNew) {
+        for (let i = 0; i < 4; i++) {
+            let d = new Date(nextFull.getTime() + i * (SYNODIC_MONTH / 2) * 24 * 60 * 60 * 1000);
+            phases.push({ date: d, type: i % 2 === 0 ? "Pleine Lune" : "Nouvelle Lune", targetFraction: i % 2 === 0 ? 0.5 : 0.0 });
+        }
+    } else {
+        for (let i = 0; i < 4; i++) {
+            let d = new Date(nextNew.getTime() + i * (SYNODIC_MONTH / 2) * 24 * 60 * 60 * 1000);
+            phases.push({ date: d, type: i % 2 === 0 ? "Nouvelle Lune" : "Pleine Lune", targetFraction: i % 2 === 0 ? 0.0 : 0.5 });
+        }
+    }
+
+    // Calcul des rappels Pleine/Nouvelle Lune
+    phases.forEach((p) => {
+        let isFull = p.type === "Pleine Lune";
+        let isNew = p.type === "Nouvelle Lune";
+        
+        if ((isFull && notificationSettings.fullMoon) || (isNew && notificationSettings.newMoon)) {
+            const evtTime = p.date.getTime();
+            const dateStr = p.date.toISOString().slice(0, 10);
+            
+            if (notificationSettings.rem3d) {
+                const d3 = new Date(evtTime - 3 * 24 * 60 * 60 * 1000);
+                scheduleNotification(`J-3 ${p.type}`, `Dans 3 jours, ce sera la ${p.type}. Préparez-vous !`, d3, `rem-3d-${dateStr}`);
+            }
+            if (notificationSettings.rem1d) {
+                const d1 = new Date(evtTime - 1 * 24 * 60 * 60 * 1000);
+                scheduleNotification(`J-1 ${p.type}`, `Demain, c'est la ${p.type}.`, d1, `rem-1d-${dateStr}`);
+            }
+            if (notificationSettings.remDay) {
+                // 1h avant (avant minuit) / 8h avant (après minuit)
+                const hour = p.date.getHours();
+                let hoursBefore = (hour < 12) ? 8 : 1; 
+                // "Après minuit" on considère < 12h (Matin). "Avant minuit" on considère >= 12h (Soir).
+                
+                const dDay = new Date(evtTime - hoursBefore * 60 * 60 * 1000);
+                scheduleNotification(`H-${hoursBefore} ${p.type}`, `La ${p.type} aura lieu dans environ ${hoursBefore} heure(s).`, dDay, `rem-day-${dateStr}`);
+            }
+        }
+    });
+
+    // Annonces des phases & Énergie (toutes les phases: NL, PQ, PL, DQ)
+    if (notificationSettings.phaseAnnonce) {
+        const majorFractions = [0, 0.25, 0.5, 0.75];
+        const fractionNames = {
+            0: "Nouvelle Lune",
+            0.25: "Premier Quartier",
+            0.5: "Pleine Lune",
+            0.75: "Dernier Quartier"
+        };
+        
+        // Trouver la date des prochaines phases
+        // On prend un point de départ et on cherche les prochaines occurences pour 2 mois
+        let allPhases = [];
+        for (let f of majorFractions) {
+            let pDate = getNextPhaseDate(f, now);
+            allPhases.push({ date: pDate, fraction: f, name: fractionNames[f] });
+            let pDate2 = new Date(pDate.getTime() + SYNODIC_MONTH * 24 * 60 * 60 * 1000);
+            allPhases.push({ date: pDate2, fraction: f, name: fractionNames[f] });
+        }
+        
+        allPhases.forEach(p => {
+            // "Les annonces des différentes phases... l'énergie du jour". 
+            // On peut notifier à 09:00 le jour J pour annoncer l'énergie du jour de la phase.
+            const notifyDate = new Date(p.date);
+            notifyDate.setHours(9, 0, 0, 0);
+            
+            // Si l'heure limite est déjà passée aujourd'hui, on ne notifie pas
+            if (notifyDate.getTime() < Date.now()) return;
+            
+            const dateStr = p.date.toISOString().slice(0, 10);
+            const ageApprox = p.fraction * SYNODIC_MONTH;
+            const extra = getGardenMood(ageApprox, p.fraction, notifyDate);
+            
+            scheduleNotification(`Phase : ${p.name}`, `☀️ Énergie du jour : ${extra.mood}`, notifyDate, `phase-${dateStr}`);
+        });
+    }
+}
 
 window.exportCalendar = () => {
     // 1. Init ICS content
