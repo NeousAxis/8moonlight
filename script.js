@@ -188,20 +188,24 @@ function drawMoon(phaseFraction, hemisphere) {
     const r = 48, cx = 50, cy = 50;
     let d = "";
 
-    if (phaseFraction < 0.02 || phaseFraction > 0.98) { d = ""; } // New
-    else if (phaseFraction > 0.48 && phaseFraction < 0.52) { // Full
+    if (phaseFraction < 0.01 || phaseFraction > 0.99) { 
+        d = ""; 
+    }
+    else if (phaseFraction > 0.49 && phaseFraction < 0.51) { 
         d = `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx} ${cy + r} A ${r} ${r} 0 1 1 ${cx} ${cy - r}`;
     } else {
-        const termRx = Math.abs(phaseFraction - 0.5) * 2 * r;
+        let termRx = Math.abs(Math.cos(phaseFraction * 2 * Math.PI)) * r;
+        if (termRx < 0.1) termRx = 0.1; // Eviter les bugs de rendu avec rx=0
+
         let sweepTerm = 0;
         let lightSideRight = false;
 
         if (isNorth) {
             lightSideRight = phaseFraction < 0.5;
-            sweepTerm = (phaseFraction < 0.25 || phaseFraction > 0.75) ? 0 : 1;
+            sweepTerm = (phaseFraction < 0.25 || (phaseFraction >= 0.5 && phaseFraction < 0.75)) ? 0 : 1;
         } else {
             lightSideRight = phaseFraction >= 0.5;
-            sweepTerm = (phaseFraction >= 0.25 && phaseFraction < 0.75) ? 0 : 1;
+            sweepTerm = (phaseFraction < 0.25 || (phaseFraction >= 0.5 && phaseFraction < 0.75)) ? 1 : 0;
         }
 
         if (lightSideRight) {
@@ -212,7 +216,10 @@ function drawMoon(phaseFraction, hemisphere) {
             d += ` A ${termRx} ${r} 0 0 ${sweepTerm} ${cx} ${cy - r}`;
         }
     }
-    els.moonPath.setAttribute('d', d);
+    
+    if (els.moonPath) {
+        els.moonPath.setAttribute('d', d);
+    }
 }
 
 // --- Formatting Helpers ---
@@ -691,6 +698,30 @@ X-WR-TIMEZONE:UTC
         let dtEnd = formatICSDate(new Date(p.date.getTime() + 60 * 60 * 1000));
         let uid = dtStart + "-moonlight@app";
 
+        let alarms = "";
+        let isFull = p.type.includes("Pleine Lune");
+        let isNew = p.type.includes("Nouvelle Lune");
+
+        // Génération des alarmes en fonction des réglages de l'application
+        if ((isFull && notificationSettings.fullMoon) || (isNew && notificationSettings.newMoon)) {
+            if (notificationSettings.rem3d) {
+                alarms += `BEGIN:VALARM\nACTION:DISPLAY\nDESCRIPTION:Rappel : ${p.type}\nTRIGGER:-P3D\nEND:VALARM\n`;
+            }
+            if (notificationSettings.rem1d) {
+                alarms += `BEGIN:VALARM\nACTION:DISPLAY\nDESCRIPTION:Rappel : ${p.type}\nTRIGGER:-P1D\nEND:VALARM\n`;
+            }
+            if (notificationSettings.remDay) {
+                const hour = p.date.getHours();
+                let hoursBefore = (hour < 12) ? 8 : 1;
+                alarms += `BEGIN:VALARM\nACTION:DISPLAY\nDESCRIPTION:Rappel : ${p.type}\nTRIGGER:-PT${hoursBefore}H\nEND:VALARM\n`;
+            }
+        }
+
+        // Alarme par défaut si rien n'est coché mais qu'on exporte (ex: 1 jour avant)
+        if (alarms === "") {
+            alarms = `BEGIN:VALARM\nACTION:DISPLAY\nDESCRIPTION:Rappel : ${p.type}\nTRIGGER:-P1D\nEND:VALARM\n`;
+        }
+
         events += `BEGIN:VEVENT
 UID:${uid}
 DTSTART:${dtStart}
@@ -701,7 +732,7 @@ DESCRIPTION:${p.desc}
 STATUS:CONFIRMED
 SEQUENCE:0
 TRANSP:TRANSPARENT
-END:VEVENT
+${alarms}END:VEVENT
 `;
     });
 
