@@ -49,6 +49,8 @@
 	<string>UIStatusBarStyleLightContent</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Votre position permet d'afficher votre ville et de calculer les heures de lever et de coucher de la Lune.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Votre position permet d'afficher votre ville et de calculer les heures de lever et de coucher de la Lune.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 </dict>
