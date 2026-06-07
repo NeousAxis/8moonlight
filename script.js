@@ -484,6 +484,7 @@ const uiToggles = {
 };
 
 let notificationSettings = {
+    enabled: false, // interrupteur maître : les rappels sont actifs ou non
     fullMoon: true,
     newMoon: false,
     rem3d: false,
@@ -539,13 +540,32 @@ const btnRequestNotifications = document.getElementById('btnRequestNotifications
 if (btnRequestNotifications) {
     const notifBtnLabel = document.getElementById('notifBtnLabel');
     const setNotifLabel = (txt) => { if (notifBtnLabel) notifBtnLabel.textContent = txt; };
-    // Le bouton reste TOUJOURS cliquable : réappuyer renvoie une notification de test.
-    const markNotifActive = () => { setNotifLabel('Rappels activés ✓ — tester'); };
 
-    // État initial : si déjà autorisé, refléter l'état actif (bouton toujours cliquable).
-    notifGranted().then((granted) => { if (granted) markNotifActive(); });
+    // Le bouton est un VRAI interrupteur : « Activer » (bleu) ou « Désactiver » (gris).
+    const renderNotifButton = () => {
+        if (notificationSettings.enabled) {
+            setNotifLabel('Désactiver les rappels');
+            btnRequestNotifications.style.background = 'rgba(255,255,255,0.12)';
+            btnRequestNotifications.style.boxShadow = 'none';
+        } else {
+            setNotifLabel('Activer les rappels automatiques');
+            btnRequestNotifications.style.background = '#2f6bff';
+            btnRequestNotifications.style.boxShadow = '0 6px 22px rgba(47,107,255,0.45)';
+        }
+    };
+    renderNotifButton();
 
     btnRequestNotifications.addEventListener('click', async () => {
+        // --- DÉSACTIVER ---
+        if (notificationSettings.enabled) {
+            notificationSettings.enabled = false;
+            localStorage.setItem('moonlight_toggles', JSON.stringify(notificationSettings));
+            await cancelAllScheduled();
+            renderNotifButton();
+            return;
+        }
+
+        // --- ACTIVER --- (demande la permission si besoin)
         let granted = await notifGranted();
         if (!granted) {
             if (IS_NATIVE && NativePlugins.LocalNotifications) {
@@ -560,14 +580,16 @@ if (btnRequestNotifications) {
                 return;
             }
         }
-        if (granted) {
-            markNotifActive();
-            scheduleAllNotifications();
-            // Notification de test immédiate : preuve concrète que les rappels fonctionnent.
-            scheduleNotification('Rappels activés 🌙', 'Vous serez prévenu avant chaque pleine et nouvelle lune.', new Date(Date.now() + 5000), 'moonlight-confirm');
-        } else {
-            alert("Notifications désactivées. Pour les activer : Réglages iOS › Moonlight › Notifications.");
+        if (!granted) {
+            alert("Notifications désactivées au niveau du système. Pour les activer : Réglages iOS › Moonlight › Notifications.");
+            return;
         }
+        notificationSettings.enabled = true;
+        localStorage.setItem('moonlight_toggles', JSON.stringify(notificationSettings));
+        renderNotifButton();
+        scheduleAllNotifications();
+        // Confirmation immédiate : l'utilisateur voit qu'une notification arrive vraiment.
+        scheduleNotification('Rappels activés 🌙', 'Vous serez prévenu avant chaque pleine et nouvelle lune.', new Date(Date.now() + 4000), 'moonlight-confirm');
     });
 }
 
@@ -615,10 +637,8 @@ async function scheduleNotification(title, body, date, tag) {
     }
 }
 
-async function scheduleAllNotifications() {
-    if (!(await notifGranted())) return;
-
-    // Natif : purge les notifications déjà planifiées avant de reprogrammer (évite les doublons).
+// Annule toutes les notifications déjà planifiées (natif).
+async function cancelAllScheduled() {
     if (IS_NATIVE && NativePlugins.LocalNotifications) {
         try {
             const pend = await NativePlugins.LocalNotifications.getPending();
@@ -627,6 +647,15 @@ async function scheduleAllNotifications() {
             }
         } catch (e) { /* ignore */ }
     }
+}
+
+async function scheduleAllNotifications() {
+    // Interrupteur maître : si les rappels sont désactivés, ne rien planifier.
+    if (!notificationSettings.enabled) { await cancelAllScheduled(); return; }
+    if (!(await notifGranted())) return;
+
+    // Purge les notifications déjà planifiées avant de reprogrammer (évite les doublons).
+    await cancelAllScheduled();
 
     // Ferme toutes les notifications existantes qui seraient planifiées ?
     // L'API actuelle overwrite si on utilise le même tag.
