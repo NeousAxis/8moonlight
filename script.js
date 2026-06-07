@@ -563,6 +563,8 @@ if (btnRequestNotifications) {
         if (granted) {
             markNotifEnabled();
             scheduleAllNotifications();
+            // Notification de confirmation immédiate : l'utilisateur voit tout de suite qu'un rappel arrive.
+            scheduleNotification('Rappels activés 🌙', 'Parfait ! Vous serez prévenu avant chaque pleine et nouvelle lune.', new Date(Date.now() + 4000), 'moonlight-confirm');
         }
     });
 }
