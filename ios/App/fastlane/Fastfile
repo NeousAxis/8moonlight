@@ -1,0 +1,118 @@
+default_platform(:ios)
+
+# Moonlight – Phases lunaires
+# Bundle ID : com.cyrilleger.moonlight   Team : BXB662X8PV
+# Auth : App Store Connect API key 8QAFD5C266
+# Lance toujours avec : LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 fastlane <lane>
+
+BUNDLE_ID = "com.cyrilleger.moonlight"
+TEAM_ID   = "BXB662X8PV"
+
+def asc_key
+  app_store_connect_api_key(
+    key_id: "8QAFD5C266",
+    issuer_id: "b140c75c-a30c-4ea7-ad1c-5dda1c16945e",
+    key_filepath: File.expand_path("~/private_keys/AuthKey_8QAFD5C266.p8"),
+    duration: 1200,
+    in_house: false
+  )
+end
+
+platform :ios do
+  desc "Build + upload to App Store Connect (TestFlight, no review)"
+  lane :release do
+    api_key = asc_key
+    update_project_team(path: "App.xcodeproj", teamid: TEAM_ID)
+    get_certificates(api_key: api_key)
+    get_provisioning_profile(
+      api_key: api_key,
+      app_identifier: BUNDLE_ID,
+      filename: "provisioning.mobileprovision",
+      readonly: false
+    )
+    update_info_plist(
+      xcodeproj: "App.xcodeproj",
+      plist_path: "App/Info.plist",
+      block: proc { |plist| plist["ITSAppUsesNonExemptEncryption"] = false }
+    )
+    update_project_provisioning(
+      xcodeproj: "App.xcodeproj",
+      profile: ENV["SIGH_PROFILE_PATH"],
+      target_filter: "App",
+      build_configuration: "Release",
+      code_signing_identity: "Apple Distribution"
+    )
+    build_app(
+      project: "App.xcodeproj",
+      scheme: "App",
+      clean: true,
+      export_method: "app-store",
+      xcargs: "-allowProvisioningUpdates CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY='Apple Distribution' DEVELOPMENT_TEAM='#{TEAM_ID}' ENABLE_PREVIEWS=NO",
+      export_options: {
+        method: "app-store",
+        signingStyle: "manual",
+        provisioningProfiles: {
+          BUNDLE_ID => "#{BUNDLE_ID} AppStore"
+        }
+      }
+    )
+    upload_to_app_store(
+      api_key: api_key,
+      force: true,
+      skip_screenshots: true,
+      skip_metadata: true,
+      skip_app_version_update: true,
+      run_precheck_before_submit: false,
+      submit_for_review: false,
+      automatic_release: false
+    )
+  end
+
+  desc "Upload an already-built App.ipa to App Store Connect (TestFlight)"
+  lane :upload_only do
+    api_key = asc_key
+    upload_to_app_store(
+      api_key: api_key,
+      ipa: "App.ipa",
+      skip_screenshots: true,
+      skip_metadata: true,
+      skip_app_version_update: true,
+      run_precheck_before_submit: false,
+      submit_for_review: false,
+      automatic_release: false,
+      force: true
+    )
+  end
+
+  desc "Build a signed .ipa only (no upload)"
+  lane :build_only do
+    api_key = asc_key
+    update_project_team(path: "App.xcodeproj", teamid: TEAM_ID)
+    get_certificates(api_key: api_key)
+    get_provisioning_profile(
+      api_key: api_key,
+      app_identifier: BUNDLE_ID,
+      filename: "provisioning.mobileprovision",
+      readonly: false
+    )
+    update_project_provisioning(
+      xcodeproj: "App.xcodeproj",
+      profile: ENV["SIGH_PROFILE_PATH"],
+      target_filter: "App",
+      build_configuration: "Release",
+      code_signing_identity: "Apple Distribution"
+    )
+    build_app(
+      project: "App.xcodeproj",
+      scheme: "App",
+      clean: true,
+      export_method: "app-store",
+      xcargs: "-allowProvisioningUpdates CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY='Apple Distribution' DEVELOPMENT_TEAM='#{TEAM_ID}' ENABLE_PREVIEWS=NO",
+      export_options: {
+        method: "app-store",
+        signingStyle: "manual",
+        provisioningProfiles: { BUNDLE_ID => "#{BUNDLE_ID} AppStore" }
+      }
+    )
+  end
+end

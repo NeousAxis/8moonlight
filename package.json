@@ -1,0 +1,24 @@
+{
+  "name": "moonlight",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Moonlight – Phases lunaires",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-www.mjs",
+    "sync": "npm run build && cap sync ios",
+    "open:ios": "cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/geolocation": "^8.2.0",
+    "@capacitor/ios": "^8.4.0",
+    "@capacitor/local-notifications": "^8.2.0",
+    "@capacitor/share": "^8.0.1"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.4.0"
+  }
+}

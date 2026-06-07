@@ -1,3 +1,40 @@
+// --- Plateforme native (Capacitor) ---
+// En environnement natif iOS, le wrapper WKWebView ne gère pas l'API Web Notification
+// ni les téléchargements de blob. On route donc géolocalisation, notifications et export
+// calendrier vers les plugins Capacitor natifs. Sur le web, le comportement PWA d'origine
+// est conservé tel quel.
+const Cap = window.Capacitor;
+const IS_NATIVE = !!(Cap && typeof Cap.isNativePlatform === 'function' && Cap.isNativePlatform());
+const NativePlugins = (Cap && Cap.Plugins) ? Cap.Plugins : {};
+
+// Récupère une position de façon unifiée (Capacitor Geolocation en natif, navigator sinon).
+async function getPositionUnified() {
+    if (IS_NATIVE && NativePlugins.Geolocation) {
+        try { await NativePlugins.Geolocation.requestPermissions(); } catch (e) { /* ignore */ }
+        return NativePlugins.Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 10000 });
+    }
+    return new Promise((resolve, reject) => {
+        if (!('geolocation' in navigator)) { reject(new Error('no-geolocation')); return; }
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
+    });
+}
+
+// Vrai si les notifications sont autorisées (LocalNotifications en natif, Notification sinon).
+async function notifGranted() {
+    if (IS_NATIVE && NativePlugins.LocalNotifications) {
+        try { const s = await NativePlugins.LocalNotifications.checkPermissions(); return s.display === 'granted'; }
+        catch (e) { return false; }
+    }
+    return ('Notification' in window) && Notification.permission === 'granted';
+}
+
+// Identifiant entier stable dérivé d'un tag (requis par LocalNotifications).
+function tagToId(tag) {
+    let h = 0;
+    for (let i = 0; i < tag.length; i++) { h = (Math.imul(h, 31) + tag.charCodeAt(i)) | 0; }
+    return (Math.abs(h) % 2000000000) + 1;
+}
+
 // --- State (Persisté via localStorage) ---
 let state = {
     lat: null,
@@ -383,58 +420,46 @@ els.inputCountry.addEventListener('input', (e) => {
 });
 
 // Logique GPS
-document.getElementById('btnGps').addEventListener('click', () => {
+document.getElementById('btnGps').addEventListener('click', async () => {
     els.gpsStatus.textContent = "Recherche du signal...";
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition((pos) => {
-            // Mise à jour des coordonnées réelles
-            state.lat = pos.coords.latitude;
-            state.lon = pos.coords.longitude;
-            state.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            state.hasLocation = true; // Marquer la localisation comme confirmée
-
-            // Feedback utilisateur
-            els.gpsStatus.textContent = "Recherche du nom de la ville...";
-            els.gpsStatus.style.color = "var(--accent)";
-
-            // Reverse Geocoding : Si l'utilisateur n'a pas SAISI manuellement une ville, ou s'il demande explicitement via le bouton GPS
-            // On considère que cliquer sur le bouton GPS veut dire "Mets à jour ma ville actuelle"
-            state.isManual = false;
-
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${state.lat}&lon=${state.lon}&accept-language=fr`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data && data.address) {
-                        const addr = data.address;
-                        // Priorité : Ville réelle > Province > District (pour les villes à statut spécial comme Da Nang)
-                        let cityName = addr.city || addr.town || addr.state || addr.province || addr.municipality || addr.village || "Position GPS";
-
-                        // Nettoyage spécifique pour le Vietnam
-                        if (cityName.includes("Ph\u01b0\u1eddng") || cityName.includes("Huy\u1ec7n")) {
-                            cityName = addr.state || addr.province || cityName;
-                        }
-
-                        state.city = cityName;
-                        state.country = addr.country || "";
-                        els.gpsStatus.textContent = `Position : ${state.city}`;
-                    } else {
-                        els.gpsStatus.textContent = "Position trouvée !";
-                    }
-                    saveState();
-                    updateApp();
-                })
-                .catch(() => {
-                    els.gpsStatus.textContent = "Position trouvée !";
-                    saveState();
-                    updateApp();
-                });
-        }, () => {
-            els.gpsStatus.textContent = "Erreur GPS / Refus permission.";
-            els.gpsStatus.style.color = "red";
-        });
-    } else {
-        els.gpsStatus.textContent = "GPS non supporté.";
+    let pos;
+    try {
+        pos = await getPositionUnified();
+    } catch (e) {
+        els.gpsStatus.textContent = "Erreur GPS / Refus permission.";
+        els.gpsStatus.style.color = "red";
+        return;
     }
+
+    state.lat = pos.coords.latitude;
+    state.lon = pos.coords.longitude;
+    state.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    state.hasLocation = true;
+
+    els.gpsStatus.textContent = "Recherche du nom de la ville...";
+    els.gpsStatus.style.color = "var(--accent)";
+    state.isManual = false;
+
+    try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${state.lat}&lon=${state.lon}&accept-language=fr`);
+        const data = await res.json();
+        if (data && data.address) {
+            const addr = data.address;
+            let cityName = addr.city || addr.town || addr.state || addr.province || addr.municipality || addr.village || "Position GPS";
+            if (cityName.includes("Phường") || cityName.includes("Huyện")) {
+                cityName = addr.state || addr.province || cityName;
+            }
+            state.city = cityName;
+            state.country = addr.country || "";
+            els.gpsStatus.textContent = `Position : ${state.city}`;
+        } else {
+            els.gpsStatus.textContent = "Position trouvée !";
+        }
+    } catch (e) {
+        els.gpsStatus.textContent = "Position trouvée !";
+    }
+    saveState();
+    updateApp();
 });
 
 // Navigation & Toggles
@@ -512,35 +537,59 @@ document.querySelectorAll('.toggle-switch').forEach(t => {
 
 const btnRequestNotifications = document.getElementById('btnRequestNotifications');
 if (btnRequestNotifications) {
-    if ('Notification' in window && Notification.permission === 'granted') {
+    const markNotifEnabled = () => {
         btnRequestNotifications.textContent = "Notifications activées ✓";
         btnRequestNotifications.disabled = true;
         btnRequestNotifications.style.opacity = '0.7';
-    }
+    };
+
+    // État initial du bouton selon la permission déjà accordée.
+    notifGranted().then((granted) => { if (granted) markNotifEnabled(); });
 
     btnRequestNotifications.addEventListener('click', async () => {
-        if (!('Notification' in window)) {
+        let granted = false;
+        if (IS_NATIVE && NativePlugins.LocalNotifications) {
+            try {
+                const r = await NativePlugins.LocalNotifications.requestPermissions();
+                granted = r.display === 'granted';
+            } catch (e) { granted = false; }
+        } else if ('Notification' in window) {
+            const permission = await Notification.requestPermission();
+            granted = permission === 'granted';
+        } else {
             alert("Les notifications ne sont pas supportées par ce navigateur.");
             return;
         }
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-            btnRequestNotifications.textContent = "Notifications activées ✓";
-            btnRequestNotifications.disabled = true;
-            btnRequestNotifications.style.opacity = '0.7';
+        if (granted) {
+            markNotifEnabled();
             scheduleAllNotifications();
         }
     });
 }
 
 async function scheduleNotification(title, body, date, tag) {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
     if (date.getTime() < Date.now()) return; // Passée
 
+    // Natif : planification via LocalNotifications (se déclenche hors app).
+    if (IS_NATIVE && NativePlugins.LocalNotifications) {
+        try {
+            await NativePlugins.LocalNotifications.schedule({
+                notifications: [{
+                    id: tagToId(tag),
+                    title: title,
+                    body: body,
+                    schedule: { at: date, allowWhileIdle: true }
+                }]
+            });
+        } catch (e) { console.log('[LN] schedule', e); }
+        return;
+    }
+
+    // Web : Notification Triggers API (Chrome Android) ou repli setTimeout.
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
     if (!('serviceWorker' in navigator)) return;
     const registration = await navigator.serviceWorker.ready;
 
-    // Utilisation de Notification Triggers API si supportée (Chrome Android)
     if ('showTrigger' in Notification.prototype) {
         registration.showNotification(title, {
             body: body,
@@ -549,8 +598,6 @@ async function scheduleNotification(title, body, date, tag) {
             showTrigger: new TimestampTrigger(date.getTime())
         });
     } else {
-        // Fallback pour les navigateurs non supportés : 
-        // On schedule juste par timeout si l'app est ouverte (et si < 24h)
         const delay = date.getTime() - Date.now();
         if (delay > 0 && delay < 86400000) {
             setTimeout(() => {
@@ -565,7 +612,17 @@ async function scheduleNotification(title, body, date, tag) {
 }
 
 async function scheduleAllNotifications() {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    if (!(await notifGranted())) return;
+
+    // Natif : purge les notifications déjà planifiées avant de reprogrammer (évite les doublons).
+    if (IS_NATIVE && NativePlugins.LocalNotifications) {
+        try {
+            const pend = await NativePlugins.LocalNotifications.getPending();
+            if (pend && pend.notifications && pend.notifications.length) {
+                await NativePlugins.LocalNotifications.cancel({ notifications: pend.notifications.map(n => ({ id: n.id })) });
+            }
+        } catch (e) { /* ignore */ }
+    }
 
     // Ferme toutes les notifications existantes qui seraient planifiées ?
     // L'API actuelle overwrite si on utilise le même tag.
@@ -655,7 +712,7 @@ async function scheduleAllNotifications() {
     }
 }
 
-window.exportCalendar = () => {
+window.exportCalendar = async () => {
     // 1. Init ICS content
     let startIcs = `BEGIN:VCALENDAR
 VERSION:2.0
@@ -736,8 +793,27 @@ ${alarms}END:VEVENT
 `;
     });
 
-    // 3. Create blob and download
+    // 3. Export : partage natif (Filesystem + Share) sur iOS, téléchargement sur le web.
     const finalIcs = startIcs + events + endIcs;
+    if (IS_NATIVE && NativePlugins.Filesystem && NativePlugins.Share) {
+        try {
+            const written = await NativePlugins.Filesystem.writeFile({
+                path: 'phases_lunaires.ics',
+                data: finalIcs,
+                directory: 'CACHE',
+                encoding: 'utf8'
+            });
+            await NativePlugins.Share.share({
+                title: 'Phases Lunaires',
+                text: 'Calendrier des phases lunaires (12 mois)',
+                url: written.uri,
+                dialogTitle: 'Ajouter au calendrier'
+            });
+        } catch (e) {
+            console.log('[ICS] partage natif échoué', e);
+        }
+        return;
+    }
     const blob = new Blob([finalIcs], { type: 'text/calendar;charset=utf-8' });
     const link = document.createElement('a');
     link.href = window.URL.createObjectURL(blob);
@@ -751,31 +827,30 @@ ${alarms}END:VEVENT
 updateApp();
 
 // Tenter une mise à jour silencieuse de la position au démarrage si déjà autorisé
-if ('geolocation' in navigator && state.hasLocation && !state.isManual) {
-    navigator.geolocation.getCurrentPosition((pos) => {
+if (state.hasLocation && !state.isManual && (IS_NATIVE || ('geolocation' in navigator))) {
+    getPositionUnified().then(async (pos) => {
         state.lat = pos.coords.latitude;
         state.lon = pos.coords.longitude;
-        // On rafraîchit le nom de la ville uniquement si ce n'est pas manuel
-        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${state.lat}&lon=${state.lon}&accept-language=fr`)
-            .then(res => res.json())
-            .then(data => {
-                if (data && data.address) {
-                    const addr = data.address;
-                    let cityName = addr.city || addr.town || addr.state || addr.province || addr.municipality || addr.village || "Position GPS";
-                    if (cityName.includes("Ph\u01b0\u1eddng") || cityName.includes("Huy\u1ec7n")) {
-                        cityName = addr.state || addr.province || cityName;
-                    }
-                    state.city = cityName;
-                    state.country = addr.country || "";
-                    saveState();
-                    updateApp();
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${state.lat}&lon=${state.lon}&accept-language=fr`);
+            const data = await res.json();
+            if (data && data.address) {
+                const addr = data.address;
+                let cityName = addr.city || addr.town || addr.state || addr.province || addr.municipality || addr.village || "Position GPS";
+                if (cityName.includes("Phường") || cityName.includes("Huyện")) {
+                    cityName = addr.state || addr.province || cityName;
                 }
-            }).catch(() => { });
-    }, () => { }, { timeout: 5000 });
+                state.city = cityName;
+                state.country = addr.country || "";
+                saveState();
+                updateApp();
+            }
+        } catch (e) { /* ignore */ }
+    }).catch(() => { });
 }
 
-// --- PWA Service Worker Registration & Auto-Update ---
-if ('serviceWorker' in navigator) {
+// --- PWA Service Worker Registration & Auto-Update (web uniquement) ---
+if (!IS_NATIVE && 'serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js')
         .then(registration => {
             console.log('[PWA] Service Worker enregistré');

@@ -1,0 +1,46 @@
+=== NAME (<=30) ===
+Moonlight – Phases lunaires
+
+=== SUBTITLE (<=30) ===
+Calendrier lunaire & rappels
+
+=== PROMOTIONAL TEXT (<=170) ===
+Suivez la Lune jour après jour : phase actuelle, illumination, prochaines pleine et nouvelle lunes, lever et coucher, et rappels personnalisés.
+
+=== KEYWORDS (<=100) ===
+lune,phase lunaire,pleine lune,nouvelle lune,calendrier lunaire,jardinage,rappel,astronomie
+
+=== DESCRIPTION (<=4000) ===
+Moonlight est une application élégante et épurée pour suivre la Lune au quotidien.
+
+Visualisez en un coup d'œil la phase lunaire actuelle, le pourcentage d'illumination et la progression du cycle. Moonlight calcule pour vous les prochaines pleines lunes et nouvelles lunes, avec le compte à rebours exact.
+
+FONCTIONNALITÉS
+• Phase de la Lune en temps réel, avec illustration fidèle du croissant
+• Pourcentage d'illumination et avancement du cycle lunaire
+• Prochaines pleine lune et nouvelle lune, avec date et compte à rebours
+• Liste des 6 prochaines phases
+• Heures de lever et de coucher de la Lune selon votre position
+• Âge de la Lune en jours
+• Conseils de jardinage et « énergie du jour » selon la phase
+• Rappels personnalisables : pleine lune, nouvelle lune, 3 jours avant, 1 jour avant, le jour J
+• Export des phases vers votre calendrier (12 mois)
+• Localisation par GPS ou saisie manuelle de votre ville
+• Interface sombre, sobre et agréable, pensée pour la nuit
+
+RESPECT DE VOTRE VIE PRIVÉE
+Moonlight fonctionne sans compte. Aucune donnée personnelle n'est collectée sur un serveur, aucune publicité, aucun suivi. Votre position sert uniquement à afficher votre ville et à calculer les horaires de la Lune.
+
+Que vous soyez passionné d'astronomie, jardinier attentif au cycle lunaire, ou simplement curieux du ciel, Moonlight vous accompagne nuit après nuit.
+
+=== WHATS NEW (v1.0) ===
+Première version de Moonlight. Bonne observation de la Lune !
+
+=== SUPPORT URL ===
+https://8moonlight.xyz/support.html
+
+=== PRIVACY POLICY URL ===
+https://8moonlight.xyz/privacy.html
+
+=== MARKETING URL ===
+https://8moonlight.xyz

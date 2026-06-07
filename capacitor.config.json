@@ -1,0 +1,10 @@
+{
+  "appId": "com.cyrilleger.moonlight",
+  "appName": "Moonlight",
+  "webDir": "www",
+  "backgroundColor": "#0b0d12",
+  "ios": {
+    "backgroundColor": "#0b0d12",
+    "contentInset": "never"
+  }
+}
