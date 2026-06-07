@@ -23,8 +23,7 @@ FONCTIONNALITÉS
 • Heures de lever et de coucher de la Lune selon votre position
 • Âge de la Lune en jours
 • Conseils de jardinage et « énergie du jour » selon la phase
-• Rappels personnalisables : pleine lune, nouvelle lune, 3 jours avant, 1 jour avant, le jour J
-• Export des phases vers votre calendrier (12 mois)
+• Rappels automatiques personnalisables : pleine lune, nouvelle lune, 3 jours avant, 1 jour avant, le jour J
 • Localisation par GPS ou saisie manuelle de votre ville
 • Interface sombre, sobre et agréable, pensée pour la nuit
 
