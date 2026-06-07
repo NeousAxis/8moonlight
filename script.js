@@ -537,34 +537,36 @@ document.querySelectorAll('.toggle-switch').forEach(t => {
 
 const btnRequestNotifications = document.getElementById('btnRequestNotifications');
 if (btnRequestNotifications) {
-    const markNotifEnabled = () => {
-        btnRequestNotifications.textContent = "Rappels activés ✓";
-        btnRequestNotifications.disabled = true;
-        btnRequestNotifications.style.opacity = '0.7';
-    };
+    const notifBtnLabel = document.getElementById('notifBtnLabel');
+    const setNotifLabel = (txt) => { if (notifBtnLabel) notifBtnLabel.textContent = txt; };
+    // Le bouton reste TOUJOURS cliquable : réappuyer renvoie une notification de test.
+    const markNotifActive = () => { setNotifLabel('Rappels activés ✓ — tester'); };
 
-    // État initial du bouton selon la permission déjà accordée.
-    notifGranted().then((granted) => { if (granted) markNotifEnabled(); });
+    // État initial : si déjà autorisé, refléter l'état actif (bouton toujours cliquable).
+    notifGranted().then((granted) => { if (granted) markNotifActive(); });
 
     btnRequestNotifications.addEventListener('click', async () => {
-        let granted = false;
-        if (IS_NATIVE && NativePlugins.LocalNotifications) {
-            try {
-                const r = await NativePlugins.LocalNotifications.requestPermissions();
-                granted = r.display === 'granted';
-            } catch (e) { granted = false; }
-        } else if ('Notification' in window) {
-            const permission = await Notification.requestPermission();
-            granted = permission === 'granted';
-        } else {
-            alert("Les notifications ne sont pas supportées par ce navigateur.");
-            return;
+        let granted = await notifGranted();
+        if (!granted) {
+            if (IS_NATIVE && NativePlugins.LocalNotifications) {
+                try {
+                    const r = await NativePlugins.LocalNotifications.requestPermissions();
+                    granted = r.display === 'granted';
+                } catch (e) { granted = false; }
+            } else if ('Notification' in window) {
+                granted = (await Notification.requestPermission()) === 'granted';
+            } else {
+                alert("Les notifications ne sont pas supportées par ce navigateur.");
+                return;
+            }
         }
         if (granted) {
-            markNotifEnabled();
+            markNotifActive();
             scheduleAllNotifications();
-            // Notification de confirmation immédiate : l'utilisateur voit tout de suite qu'un rappel arrive.
-            scheduleNotification('Rappels activés 🌙', 'Parfait ! Vous serez prévenu avant chaque pleine et nouvelle lune.', new Date(Date.now() + 4000), 'moonlight-confirm');
+            // Notification de test immédiate : preuve concrète que les rappels fonctionnent.
+            scheduleNotification('Rappels activés 🌙', 'Vous serez prévenu avant chaque pleine et nouvelle lune.', new Date(Date.now() + 5000), 'moonlight-confirm');
+        } else {
+            alert("Notifications désactivées. Pour les activer : Réglages iOS › Moonlight › Notifications.");
         }
     });
 }
