@@ -538,7 +538,7 @@ document.querySelectorAll('.toggle-switch').forEach(t => {
 const btnRequestNotifications = document.getElementById('btnRequestNotifications');
 if (btnRequestNotifications) {
     const markNotifEnabled = () => {
-        btnRequestNotifications.textContent = "Notifications activées ✓";
+        btnRequestNotifications.textContent = "Rappels activés ✓";
         btnRequestNotifications.disabled = true;
         btnRequestNotifications.style.opacity = '0.7';
     };
@@ -711,98 +711,6 @@ async function scheduleAllNotifications() {
         });
     }
 }
-
-window.exportCalendar = async () => {
-    // 1. Init ICS content
-    let startIcs = `BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//Moonlight//NONSGML v1.0//FR
-CALSCALE:GREGORIAN
-METHOD:PUBLISH
-X-WR-CALNAME:Phases Lunaires
-X-WR-TIMEZONE:UTC
-`;
-    let endIcs = `END:VCALENDAR`;
-    let events = "";
-
-    const now = new Date();
-    const formatICSDate = (d) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-    const dtstamp = formatICSDate(now);
-
-    // 2. ~12 mois de phases, regroupées en DEUX séries récurrentes (Nouvelle / Pleine).
-    //    Chaque série = un seul VEVENT + RDATE listant les dates exactes -> l'agenda les
-    //    traite comme une série : on peut supprimer UNE occurrence ou TOUTE la série.
-    const nextNew = getNextPhaseDate(0, now);
-    const nextFull = getNextPhaseDate(0.5, now);
-    const newMoons = [];
-    const fullMoons = [];
-    for (let i = 0; i < 13; i++) {
-        newMoons.push(new Date(nextNew.getTime() + i * SYNODIC_MONTH * 24 * 60 * 60 * 1000));
-        fullMoons.push(new Date(nextFull.getTime() + i * SYNODIC_MONTH * 24 * 60 * 60 * 1000));
-    }
-
-    const buildSeries = (dates, summary, desc, uid, enabled) => {
-        if (!dates.length) return "";
-        const first = dates[0];
-        const dtStart = formatICSDate(first);
-        const dtEnd = formatICSDate(new Date(first.getTime() + 60 * 60 * 1000));
-        const rest = dates.slice(1).map(formatICSDate);
-        const rdate = rest.length ? `RDATE;VALUE=DATE-TIME:${rest.join(',')}\n` : "";
-
-        let alarms = "";
-        if (enabled) {
-            if (notificationSettings.rem3d) alarms += `BEGIN:VALARM\nACTION:DISPLAY\nDESCRIPTION:Rappel : ${summary}\nTRIGGER:-P3D\nEND:VALARM\n`;
-            if (notificationSettings.rem1d) alarms += `BEGIN:VALARM\nACTION:DISPLAY\nDESCRIPTION:Rappel : ${summary}\nTRIGGER:-P1D\nEND:VALARM\n`;
-            if (notificationSettings.remDay) alarms += `BEGIN:VALARM\nACTION:DISPLAY\nDESCRIPTION:Rappel : ${summary}\nTRIGGER:-PT1H\nEND:VALARM\n`;
-        }
-        if (alarms === "") alarms = `BEGIN:VALARM\nACTION:DISPLAY\nDESCRIPTION:Rappel : ${summary}\nTRIGGER:-P1D\nEND:VALARM\n`;
-
-        return `BEGIN:VEVENT
-UID:${uid}
-DTSTART:${dtStart}
-DTEND:${dtEnd}
-${rdate}DTSTAMP:${dtstamp}
-SUMMARY:${summary}
-DESCRIPTION:${desc}
-STATUS:CONFIRMED
-SEQUENCE:0
-TRANSP:TRANSPARENT
-${alarms}END:VEVENT
-`;
-    };
-
-    events += buildSeries(newMoons, "Nouvelle Lune 🌑", "Nouvelle Lune (illumination 0%)", "moonlight-newmoon-series@8moonlight.xyz", notificationSettings.newMoon);
-    events += buildSeries(fullMoons, "Pleine Lune 🌕", "Pleine Lune (illumination 100%)", "moonlight-fullmoon-series@8moonlight.xyz", notificationSettings.fullMoon);
-
-    // 3. Export : partage natif (Filesystem + Share) sur iOS, téléchargement sur le web.
-    const finalIcs = startIcs + events + endIcs;
-    if (IS_NATIVE && NativePlugins.Filesystem && NativePlugins.Share) {
-        try {
-            const written = await NativePlugins.Filesystem.writeFile({
-                path: 'phases_lunaires.ics',
-                data: finalIcs,
-                directory: 'CACHE',
-                encoding: 'utf8'
-            });
-            await NativePlugins.Share.share({
-                title: 'Phases Lunaires',
-                text: 'Calendrier des phases lunaires (12 mois)',
-                url: written.uri,
-                dialogTitle: 'Ajouter au calendrier'
-            });
-        } catch (e) {
-            console.log('[ICS] partage natif échoué', e);
-        }
-        return;
-    }
-    const blob = new Blob([finalIcs], { type: 'text/calendar;charset=utf-8' });
-    const link = document.createElement('a');
-    link.href = window.URL.createObjectURL(blob);
-    link.setAttribute('download', 'phases_lunaires.ics');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-};
 
 // Init
 updateApp();
