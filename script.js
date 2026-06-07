@@ -726,72 +726,53 @@ X-WR-TIMEZONE:UTC
     let events = "";
 
     const now = new Date();
-    // Helper formats date to YYYYMMDDTHHmmSSZ
-    const formatICSDate = (d) => {
-        return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-    };
+    const formatICSDate = (d) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    const dtstamp = formatICSDate(now);
 
-    // 2. Generate events for next 12 months (approx 25 phases)
-    let nextNew = getNextPhaseDate(0, now);
-    let nextFull = getNextPhaseDate(0.5, now);
-    let phases = [];
-
-    // Determine starting order
-    if (nextFull < nextNew) {
-        for (let i = 0; i < 25; i++) {
-            let d = new Date(nextFull.getTime() + i * (SYNODIC_MONTH / 2) * 24 * 60 * 60 * 1000);
-            phases.push({ date: d, type: i % 2 === 0 ? "Pleine Lune 🌕" : "Nouvelle Lune 🌑", desc: i % 2 === 0 ? "Illumination: 100%" : "Illumination: 0%" });
-        }
-    } else {
-        for (let i = 0; i < 25; i++) {
-            let d = new Date(nextNew.getTime() + i * (SYNODIC_MONTH / 2) * 24 * 60 * 60 * 1000);
-            phases.push({ date: d, type: i % 2 === 0 ? "Nouvelle Lune 🌑" : "Pleine Lune 🌕", desc: i % 2 === 0 ? "Illumination: 0%" : "Illumination: 100%" });
-        }
+    // 2. ~12 mois de phases, regroupées en DEUX séries récurrentes (Nouvelle / Pleine).
+    //    Chaque série = un seul VEVENT + RDATE listant les dates exactes -> l'agenda les
+    //    traite comme une série : on peut supprimer UNE occurrence ou TOUTE la série.
+    const nextNew = getNextPhaseDate(0, now);
+    const nextFull = getNextPhaseDate(0.5, now);
+    const newMoons = [];
+    const fullMoons = [];
+    for (let i = 0; i < 13; i++) {
+        newMoons.push(new Date(nextNew.getTime() + i * SYNODIC_MONTH * 24 * 60 * 60 * 1000));
+        fullMoons.push(new Date(nextFull.getTime() + i * SYNODIC_MONTH * 24 * 60 * 60 * 1000));
     }
 
-    phases.forEach(p => {
-        let dtStart = formatICSDate(p.date);
-        // Event lasts 1 hour
-        let dtEnd = formatICSDate(new Date(p.date.getTime() + 60 * 60 * 1000));
-        let uid = dtStart + "-moonlight@app";
+    const buildSeries = (dates, summary, desc, uid, enabled) => {
+        if (!dates.length) return "";
+        const first = dates[0];
+        const dtStart = formatICSDate(first);
+        const dtEnd = formatICSDate(new Date(first.getTime() + 60 * 60 * 1000));
+        const rest = dates.slice(1).map(formatICSDate);
+        const rdate = rest.length ? `RDATE;VALUE=DATE-TIME:${rest.join(',')}\n` : "";
 
         let alarms = "";
-        let isFull = p.type.includes("Pleine Lune");
-        let isNew = p.type.includes("Nouvelle Lune");
-
-        // Génération des alarmes en fonction des réglages de l'application
-        if ((isFull && notificationSettings.fullMoon) || (isNew && notificationSettings.newMoon)) {
-            if (notificationSettings.rem3d) {
-                alarms += `BEGIN:VALARM\nACTION:DISPLAY\nDESCRIPTION:Rappel : ${p.type}\nTRIGGER:-P3D\nEND:VALARM\n`;
-            }
-            if (notificationSettings.rem1d) {
-                alarms += `BEGIN:VALARM\nACTION:DISPLAY\nDESCRIPTION:Rappel : ${p.type}\nTRIGGER:-P1D\nEND:VALARM\n`;
-            }
-            if (notificationSettings.remDay) {
-                const hour = p.date.getHours();
-                let hoursBefore = (hour < 12) ? 8 : 1;
-                alarms += `BEGIN:VALARM\nACTION:DISPLAY\nDESCRIPTION:Rappel : ${p.type}\nTRIGGER:-PT${hoursBefore}H\nEND:VALARM\n`;
-            }
+        if (enabled) {
+            if (notificationSettings.rem3d) alarms += `BEGIN:VALARM\nACTION:DISPLAY\nDESCRIPTION:Rappel : ${summary}\nTRIGGER:-P3D\nEND:VALARM\n`;
+            if (notificationSettings.rem1d) alarms += `BEGIN:VALARM\nACTION:DISPLAY\nDESCRIPTION:Rappel : ${summary}\nTRIGGER:-P1D\nEND:VALARM\n`;
+            if (notificationSettings.remDay) alarms += `BEGIN:VALARM\nACTION:DISPLAY\nDESCRIPTION:Rappel : ${summary}\nTRIGGER:-PT1H\nEND:VALARM\n`;
         }
+        if (alarms === "") alarms = `BEGIN:VALARM\nACTION:DISPLAY\nDESCRIPTION:Rappel : ${summary}\nTRIGGER:-P1D\nEND:VALARM\n`;
 
-        // Alarme par défaut si rien n'est coché mais qu'on exporte (ex: 1 jour avant)
-        if (alarms === "") {
-            alarms = `BEGIN:VALARM\nACTION:DISPLAY\nDESCRIPTION:Rappel : ${p.type}\nTRIGGER:-P1D\nEND:VALARM\n`;
-        }
-
-        events += `BEGIN:VEVENT
+        return `BEGIN:VEVENT
 UID:${uid}
 DTSTART:${dtStart}
 DTEND:${dtEnd}
-DTSTAMP:${formatICSDate(new Date())}
-SUMMARY:${p.type}
-DESCRIPTION:${p.desc}
+${rdate}DTSTAMP:${dtstamp}
+SUMMARY:${summary}
+DESCRIPTION:${desc}
 STATUS:CONFIRMED
 SEQUENCE:0
 TRANSP:TRANSPARENT
 ${alarms}END:VEVENT
 `;
-    });
+    };
+
+    events += buildSeries(newMoons, "Nouvelle Lune 🌑", "Nouvelle Lune (illumination 0%)", "moonlight-newmoon-series@8moonlight.xyz", notificationSettings.newMoon);
+    events += buildSeries(fullMoons, "Pleine Lune 🌕", "Pleine Lune (illumination 100%)", "moonlight-fullmoon-series@8moonlight.xyz", notificationSettings.fullMoon);
 
     // 3. Export : partage natif (Filesystem + Share) sur iOS, téléchargement sur le web.
     const finalIcs = startIcs + events + endIcs;
