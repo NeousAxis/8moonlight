@@ -19,6 +19,42 @@ def asc_key
 end
 
 platform :ios do
+  # Multi-target (App + MoonWidgetExtension) — signature AUTOMATIQUE.
+  # Gère l'app ET l'extension widget, crée/télécharge les 2 profils de distribution
+  # à la volée via la clé API ( -allowProvisioningUpdates ).
+  desc "Build + upload App + Widget to App Store Connect (TestFlight, no review)"
+  lane :release_widget do
+    api_key = asc_key
+    update_project_team(path: "App.xcodeproj", teamid: TEAM_ID)
+    update_info_plist(
+      xcodeproj: "App.xcodeproj",
+      plist_path: "App/Info.plist",
+      block: proc { |plist| plist["ITSAppUsesNonExemptEncryption"] = false }
+    )
+    build_app(
+      project: "App.xcodeproj",
+      scheme: "App",
+      clean: true,
+      export_method: "app-store",
+      xcargs: "-allowProvisioningUpdates ENABLE_PREVIEWS=NO",
+      export_options: {
+        method: "app-store",
+        signingStyle: "automatic",
+        teamID: TEAM_ID
+      }
+    )
+    upload_to_app_store(
+      api_key: api_key,
+      force: true,
+      skip_screenshots: true,
+      skip_metadata: true,
+      skip_app_version_update: true,
+      run_precheck_before_submit: false,
+      submit_for_review: false,
+      automatic_release: false
+    )
+  end
+
   desc "Build + upload to App Store Connect (TestFlight, no review)"
   lane :release do
     api_key = asc_key

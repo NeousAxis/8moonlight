@@ -104,22 +104,205 @@ const GARDEN_ADVICE = {
     rest: { icon: "⛔", type: "Repos", action: "La lune est défavorable (nœud lunaire/apogée/périgée). Reposez-vous." }
 };
 
-const MOOD_ADVICE = {
-    waxing: [ // Croissant
-        "⚡️ Énergie montante. Lancez de nouveaux projets.",
-        "💡 Votre intuition est affûtée. Écoutez-la.",
-        "🤝 Bon moment pour les rencontres et la communication.",
-        "🚀 Action ! C'est le moment de passer à l'étape supérieure."
+// Banque « Énergie du jour » GÉNÉRÉE par scripts/gen_energy.mjs — NE PAS éditer à la main.
+// 8 phases, sélection déterministe identique au widget natif (MoonWidget.swift).
+const ENERGY_LIB = [
+    [ // 0
+        "🌑 Dans le noir total, tout devient possible. Pose une intention.",
+        "🌱 La graine se sème dans l'obscurité. Rêve ton prochain cycle.",
+        "🤫 Fais silence. C'est dans le vide que naissent les commencements.",
+        "🕯️ Allume une intention comme on allume une bougie.",
+        "🌌 La nuit la plus sombre porte déjà la lumière à venir.",
+        "🧭 Choisis une direction, même minuscule. Le cycle s'ouvre.",
+        "💤 Repose-toi : la terre aussi dort avant de germer.",
+        "✍️ Écris ce que tu veux faire éclore. Les mots sèment.",
+        "🌑 Rien à montrer, tout à imaginer. Laisse venir.",
+        "🫧 Vide-toi du superflu pour faire place au neuf.",
+        "🌒 Un nouveau souffle commence. Inspire profondément.",
+        "🔮 Écoute tes désirs discrets : ils dessinent demain.",
+        "🪔 Dans l'ombre, ta lumière intérieure suffit.",
+        "🌰 Tout grand arbre fut d'abord une intention dans le noir.",
+        "🧘 Reviens à toi. Le commencement est intérieur.",
+        "🌑 Ne force rien. Plante, puis laisse l'invisible travailler.",
+        "💫 Formule un vœu simple et sincère. La lune t'écoute.",
+        "🌊 Laisse refluer l'ancien cycle. Accueille la page blanche.",
+        "🕊️ Pardonne-toi le repos. Germer demande du silence.",
+        "🌑 Premier jour d'un nouveau rêve. Que veux-tu appeler à toi ?",
     ],
-    waning: [ // Décroissant
-        "🧹 Phase de nettoyage. Triez, rangez, jetez.",
-        "🧘‍♀️ Ralentissez. C'est un temps pour l'introspection.",
-        "🔋 Rechargez vos batteries. Ne commencez rien de grand.",
-        "🍂 Lâcher-prise. Acceptez ce qui se termine."
+    [ // 1
+        "🌒 La première lueur perce. Ose un premier pas.",
+        "🌱 Ta graine pointe. Protège ce qui commence.",
+        "🔥 Une petite flamme grandit en toi. Nourris-la.",
+        "🚶 Avance doucement : l'élan se construit pas à pas.",
+        "🌿 Le fragile a besoin de patience, pas de pression.",
+        "💪 Le courage, c'est continuer même quand c'est ténu.",
+        "🌒 Crois en ce qui n'est pas encore visible.",
+        "🪴 Arrose ton intention par de petites actions.",
+        "✨ Ce qui émerge est précieux. Veille sur lui.",
+        "🌊 Le mouvement monte. Laisse-toi porter sans te précipiter.",
+        "🎯 Garde le cap : la constance fait germer les rêves.",
+        "🌒 Encore frêle, déjà vivant. Honore le début.",
+        "🤲 Accueille l'aide : on grandit rarement seul.",
+        "🌤️ Après l'obscurité, la confiance revient lentement.",
+        "🪶 Sois doux avec tes premiers essais maladroits.",
+        "🌱 Chaque geste compte plus que sa taille.",
+        "🧗 La pente est douce encore. Prends de l'élan.",
+        "💡 Une idée neuve demande qu'on y croie en premier.",
+        "🌒 Laisse pousser sans déterrer pour vérifier.",
+        "🌅 Le jour se lève sur ton projet. Continue.",
     ],
-    new: "🌑 Nouvelle Lune : Posez vos intentions pour le cycle à venir.",
-    full: "🌕 Pleine Lune : Émotions intenses. Célébrez vos accomplissements."
-};
+    [ // 2
+        "🌓 Mi-chemin : c'est l'heure de décider.",
+        "⚔️ Les obstacles arrivent pour révéler ta volonté.",
+        "💥 Agis maintenant. L'hésitation use plus que l'effort.",
+        "🧱 Un mur ? Une marche déguisée. Monte.",
+        "🌓 Tension féconde : c'est le moment de pousser.",
+        "🔨 Construis. Les rêves veulent des mains.",
+        "🚀 Engage-toi pour de vrai. Saute.",
+        "🦁 Affronte ce que tu évites. Ta force est là.",
+        "⚖️ Choisis : on ne grandit pas en restant entre deux.",
+        "🌓 Le doute est normal. Avance avec lui.",
+        "🛠️ Ajuste, corrige, persiste. Ne lâche pas.",
+        "🔥 Mets ton énergie là où ça compte vraiment.",
+        "🧭 Réaffirme ta direction et tiens-la.",
+        "💪 La résistance prouve que tu progresses.",
+        "🌊 Fends la vague au lieu de la subir.",
+        "🎬 Action : ce qui n'est pas tenté reste un regret.",
+        "🌓 Demi-lune, pleine détermination.",
+        "🪓 Coupe ce qui te freine. Décide net.",
+        "⏫ Passe à l'étape supérieure. Tu es prêt.",
+        "🏹 Vise, tends l'arc, lâche.",
+    ],
+    [ // 3
+        "🌔 Presque pleine : affine plutôt que d'ajouter.",
+        "🔍 Soigne les détails. La beauté est dans le fini.",
+        "🌱 Patiente : ce qui mûrit ne se presse pas.",
+        "🧵 Resserre les fils, peaufine ton œuvre.",
+        "🌔 Tu approches. Garde la foi et le rythme.",
+        "🪄 Polis ton intention jusqu'à ce qu'elle brille.",
+        "🌊 La marée monte presque à son comble. Tiens bon.",
+        "🧘 Respire : la dernière ligne droite teste la patience.",
+        "🔧 Corrige le cap sans tout recommencer.",
+        "🌔 Fais confiance au processus, même imparfait.",
+        "📈 Les efforts s'accumulent. Bientôt la récolte.",
+        "🕰️ Donne du temps au temps. Ça prend forme.",
+        "🌔 Encore un peu : ne sabote pas si près du but.",
+        "🪞 Relis, ajuste, améliore. Puis lâche.",
+        "🌗 La maturité approche. Cultive la constance.",
+        "💎 Ce qui se construit lentement dure longtemps.",
+        "🌔 Affûte tes intentions comme une lame.",
+        "🤝 Demande un regard extérieur pour parfaire.",
+        "🌾 La promesse gonfle. Prépare la moisson.",
+        "✨ Tu es plus proche que tu ne crois. Continue.",
+    ],
+    [ // 4
+        "🌕 Tout s'illumine. Célèbre le chemin parcouru.",
+        "🌝 Lumière maximale : vois clair en toi.",
+        "🙏 Gratitude. Compte tes récoltes, pas tes manques.",
+        "🌊 Les émotions débordent. Laisse-les couler sans peur.",
+        "🎉 Honore ce que tu as accompli, même petit.",
+        "🌕 Ce qui était caché se révèle. Accueille la vérité.",
+        "💞 Cœur ouvert : aime, remercie, pardonne.",
+        "🔥 Énergie à son comble. Rayonne sans te brûler.",
+        "🌕 Relâche ce qui pèse. La pleine lune libère.",
+        "✨ Savoure l'instant : ce sommet est éphémère.",
+        "🌝 Danse, chante, ressens. La vie est intense ce soir.",
+        "🪞 La clarté montre aussi ce qui doit changer.",
+        "🌕 Récolte les fruits de tes intentions semées.",
+        "💫 Tes sens sont aiguisés. Écoute ton intuition.",
+        "🌊 Marée haute des émotions : respire, ne te noie pas.",
+        "🕯️ Fais le bilan à la lumière pleine.",
+        "🌕 Plénitude : tu es exactement où il faut.",
+        "🤍 Pardonne-toi. La lumière n'accuse pas, elle éclaire.",
+        "🎆 Célèbre, partage ta joie : elle se multiplie.",
+        "🌝 Lève les yeux : la beauté te répond.",
+    ],
+    [ // 5
+        "🌖 Le trop-plein se partage. Donne ce que tu as reçu.",
+        "🤲 Transmets : ton expérience éclaire les autres.",
+        "🌾 Temps de la récolte partagée. Sois généreux.",
+        "📖 Raconte ton chemin, il sert à quelqu'un.",
+        "🌖 Reçois les fruits, puis offre-les.",
+        "💬 Exprime ta gratitude à voix haute.",
+        "🍂 La décrue commence. Relâche en douceur.",
+        "🫶 Aider est aussi une manière de grandir.",
+        "🌖 Diffuse ta lumière sans t'épuiser.",
+        "🧩 Tire les leçons de ce qui vient de culminer.",
+        "🌱 Sème pour autrui ce que tu as appris.",
+        "🕊️ Le partage allège le cœur.",
+        "🌖 Range, trie, redonne ce qui ne sert plus.",
+        "🙌 Célèbre les autres, pas seulement toi.",
+        "🌗 La lumière décline : commence à intérioriser.",
+        "🍯 Savoure les fruits mûrs avant qu'ils ne passent.",
+        "🌖 Reconnais l'aide reçue. Dis merci.",
+        "🌊 Le reflux porte ses propres cadeaux.",
+        "🔁 Boucle ce qui doit l'être, transmets le reste.",
+        "💝 Ta générosité revient toujours, autrement.",
+    ],
+    [ // 6
+        "🌗 L'heure du tri. Lâche ce qui n'est plus toi.",
+        "✂️ Coupe les liens usés sans culpabilité.",
+        "🍂 Laisse tomber les feuilles mortes du cycle.",
+        "🧹 Nettoie, range, allège ton espace et ta tête.",
+        "🌗 Pardonne, pour te libérer plus que l'autre.",
+        "🔓 Défais ce qui t'enferme. Respire.",
+        "🪶 Tout n'a pas à être gardé. Déleste-toi.",
+        "🌗 Remets en question ce qui ne marche plus.",
+        "🌊 Le reflux emporte l'inutile. Laisse partir.",
+        "🕯️ Fais le deuil de ce qui est terminé.",
+        "🧺 Vide pour faire place. Le neuf veut de l'espace.",
+        "🌗 Termine ce qui traîne, n'entame rien de grand.",
+        "🍃 Détache-toi doucement, sans te juger.",
+        "🔄 Réévalue tes choix à tête reposée.",
+        "🌗 Ce qui s'efface libère de l'énergie.",
+        "🚪 Ferme certaines portes pour en ouvrir d'autres.",
+        "🧘 Introspection : que t'a appris ce cycle ?",
+        "🪣 Jette le superflu, garde l'essentiel.",
+        "🌗 Lâcher-prise n'est pas perdre, c'est s'alléger.",
+        "🌙 Range le passé pour rêver le futur.",
+    ],
+    [ // 7
+        "🌘 Le cycle s'achève. Repose-toi vraiment.",
+        "💤 Dors, rêve, recharge. Tu as assez fait.",
+        "🕊️ Abandonne le contrôle. Laisse la vie respirer.",
+        "🌘 Retire-toi un peu du monde. Soigne-toi.",
+        "🍵 Ralentis. Le silence guérit.",
+        "🌙 Presque dans le noir : prépare doucement le neuf.",
+        "🧘 Médite. Écoute ce qui se tait en toi.",
+        "🌘 Ne commence rien de grand. Laisse mûrir.",
+        "🌾 La terre se repose après la récolte. Toi aussi.",
+        "💧 Pleure si besoin : l'eau lave et libère.",
+        "🌘 Fais le bilan tendre du cycle écoulé.",
+        "🕯️ Veille basse : économise ta lumière.",
+        "🤍 Sois doux avec ta fatigue. Elle a un sens.",
+        "🌘 Le vide revient : accueille-le sans peur.",
+        "🛌 Le repos n'est pas une perte de temps.",
+        "🌌 Rêve grand pendant que tout se tait.",
+        "🍂 Laisse partir les derniers regrets.",
+        "🌘 Boucle la boucle. Remercie, puis relâche.",
+        "🌊 Marée basse de l'âme : reconstitue tes forces.",
+        "🌑 Bientôt la nouvelle lune. Prépare ton vœu.",
+    ],
+];
+function energyHash(s) { let h = 0; for (let i = 0; i < s.length; i++) { h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0; } return h; }
+function energyPhaseIndex(pf) {
+    if (pf < 0.02 || pf > 0.98) return 0;
+    if (pf < 0.24) return 1;
+    if (pf < 0.26) return 2;
+    if (pf < 0.49) return 3;
+    if (pf < 0.51) return 4;
+    if (pf < 0.74) return 5;
+    if (pf < 0.76) return 6;
+    return 7;
+}
+function energyOfDay(pf, d) {
+    const idx = energyPhaseIndex(pf);
+    const arr = ENERGY_LIB[idx];
+    const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}-${idx}`;
+    const n = arr.length;
+    const i = ((energyHash(key) % n) + n) % n;
+    return arr[i];
+}
 
 const SEASON_DATA = {
     0: { fruits: "Pomme, Poire, Clémentine, Kiwi", veggies: "Poireau, Chou, Carotte, Endive" }, // Jan
@@ -171,16 +354,8 @@ function getGardenMood(age, phaseFraction, targetDate = new Date()) {
     // Gestion Nœuds lunaires (Repos) - Simulation simple (tous les 14 jours)
     if (Math.abs(age - 13.5) < 0.5 || Math.abs(age - 27) < 0.5) gardenKey = 'rest';
 
-    // Mood
-    let mood = "";
-    if (phaseFraction < 0.02 || phaseFraction > 0.98) mood = MOOD_ADVICE.new;
-    else if (phaseFraction > 0.48 && phaseFraction < 0.52) mood = MOOD_ADVICE.full;
-    else {
-        const list = (phaseFraction < 0.5) ? MOOD_ADVICE.waxing : MOOD_ADVICE.waning;
-        // Choix du message basé sur le jour du mois pour qu'il reste fixe toute la journée
-        const targetIndex = targetDate.getDate() % list.length;
-        mood = list[targetIndex];
-    }
+    // Énergie du jour (banque générée, déterministe : stable/jour, variable/mois)
+    const mood = energyOfDay(phaseFraction, targetDate);
 
     return { garden: GARDEN_ADVICE[gardenKey], mood };
 }
