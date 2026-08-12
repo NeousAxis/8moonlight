@@ -11,68 +11,13 @@
 import WidgetKit
 import SwiftUI
 
-// MARK: - Astronomie (port exact de script.js)
-
-enum Moon {
-    static let synodicMonth = 29.53058867
-    // 2000-01-06T12:24:00Z  ==  947161440 (epoch seconds)
-    static let referenceNewMoon = Date(timeIntervalSince1970: 947_161_440)
-
-    struct Data {
-        let age: Double
-        let phaseFraction: Double
-        let illumination: Double
-        let phaseName: String
-    }
-
-    static func data(for date: Date) -> Data {
-        let diffDays = (date.timeIntervalSince1970 - referenceNewMoon.timeIntervalSince1970) / 86_400.0
-        var age = diffDays.truncatingRemainder(dividingBy: synodicMonth)
-        if age < 0 { age += synodicMonth }
-        let phaseFraction = age / synodicMonth
-        let illumination = 0.5 * (1 - cos(2 * .pi * phaseFraction))
-
-        let name: String
-        if phaseFraction < 0.02 || phaseFraction > 0.98 { name = "Nouvelle Lune" }
-        else if phaseFraction < 0.24 { name = "Premier croissant" }
-        else if phaseFraction < 0.26 { name = "Premier quartier" }
-        else if phaseFraction < 0.49 { name = "Gibbeuse croissante" }
-        else if phaseFraction < 0.51 { name = "Pleine Lune" }
-        else if phaseFraction < 0.74 { name = "Gibbeuse décroissante" }
-        else if phaseFraction < 0.76 { name = "Dernier quartier" }
-        else { name = "Dernier croissant" }
-
-        return Data(age: age, phaseFraction: phaseFraction, illumination: illumination, phaseName: name)
-    }
-
-    /// Prochaine date où la lune atteint `targetFraction` (0 = nouvelle, 0.5 = pleine).
-    static func nextPhaseDate(_ targetFraction: Double, from start: Date) -> Date {
-        let cur = data(for: start)
-        let daysToAdd: Double
-        if targetFraction > cur.phaseFraction {
-            daysToAdd = (targetFraction - cur.phaseFraction) * synodicMonth
-        } else {
-            daysToAdd = (1 - cur.phaseFraction + targetFraction) * synodicMonth
-        }
-        return start.addingTimeInterval(daysToAdd * 86_400)
-    }
-
-    /// Reproduit le libellé du widget de l'app : « J-X Pleine Lune » ou « J-X Nouvelle Lune »
-    /// pour l'événement (nouvelle/pleine) le plus proche.
-    static func countdown(from now: Date) -> String {
-        let nextNew = nextPhaseDate(0, from: now)
-        let nextFull = nextPhaseDate(0.5, from: now)
-        let diffNew = nextNew.timeIntervalSince(now)
-        let diffFull = nextFull.timeIntervalSince(now)
-        if diffNew < diffFull {
-            let days = Int(floor(diffNew / 86_400))
-            return "J-\(days) Nouvelle Lune"
-        } else {
-            let days = Int(floor(diffFull / 86_400))
-            return "J-\(days) Pleine Lune"
-        }
-    }
-}
+// MARK: - Astronomie
+//
+// Le calcul vit desormais dans MoonAstronomy.swift : longitudes du Soleil et de
+// la Lune d apres Meeus, puis recherche de l instant ou leur elongation atteint
+// la phase voulue. Le modele synodique moyen precedent affichait un libelle
+// « J-X » different de celui de l app 150 jours sur 365 ; il est desormais
+// identique 365 jours sur 365.
 
 // MARK: - Énergie du jour (port de MOOD_ADVICE / getGardenMood de script.js)
 
