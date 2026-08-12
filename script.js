@@ -1223,8 +1223,13 @@ async function scheduleAllNotifications() {
             }
 
             if (e.type === 'meteor') {
-                // Un essaim s'observe la nuit : on prévient en début de soirée.
-                enqueue(atHour(e.date, 21), e.title, e.detail, 'evt-' + e.id);
+                // Un essaim s'observe la nuit, on prévient en début de soirée.
+                // Un maximum qui tombe avant midi appartient à la nuit précédente :
+                // on prévient donc la veille au soir, sinon l'utilisateur sortirait
+                // une nuit trop tard.
+                const soir = new Date(e.date);
+                if (soir.getHours() < 12) soir.setDate(soir.getDate() - 1);
+                enqueue(atHour(soir, 21), e.title, e.detail, 'evt-' + e.id);
                 return;
             }
 
