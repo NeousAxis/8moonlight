@@ -908,15 +908,19 @@ let notificationSettings = {
     rem1d: false,
     remDay: true,
     phaseAnnonce: false,
-    // Événements astronomiques. Les éclipses, les super lunes et les grandes
-    // pluies d'étoiles filantes sont actives par défaut : ce sont les rendez-vous
-    // qu'on regrette d'avoir manqués.
+    // Événements astronomiques, tous annoncés par défaut. Cela représente une
+    // quarantaine de notifications par an, un peu plus de trois par mois.
     evtEclipse: true,
     evtLune: true,
     evtMeteor: true,
-    evtPlanet: false,
-    evtSaison: false
+    evtPlanet: true,
+    evtSaison: true
 };
+
+// Version des réglages. À incrémenter quand on change une valeur par défaut :
+// sans cela, une installation existante conserverait indéfiniment l'ancienne
+// valeur, déjà écrite dans localStorage, et ne verrait jamais le changement.
+const SETTINGS_VERSION = 2;
 
 // Load saved toggle states
 function loadToggleStates() {
@@ -925,6 +929,19 @@ function loadToggleStates() {
         // Fallback for previous structure
         const parsed = JSON.parse(saved);
         notificationSettings = { ...notificationSettings, ...parsed };
+
+        // Migration v2 : les planètes et les saisons passent en alerte. On force
+        // la valeur une seule fois, puis on l'enregistre, pour qu'un utilisateur
+        // qui les désactiverait ensuite ne les voie pas revenir à chaque
+        // ouverture de l'app.
+        if ((parsed.settingsVersion || 1) < 2) {
+            notificationSettings.evtPlanet = true;
+            notificationSettings.evtSaison = true;
+        }
+    }
+    if (notificationSettings.settingsVersion !== SETTINGS_VERSION) {
+        notificationSettings.settingsVersion = SETTINGS_VERSION;
+        localStorage.setItem('moonlight_toggles', JSON.stringify(notificationSettings));
     }
     for (const [key, element] of Object.entries(uiToggles)) {
         if (element) {
