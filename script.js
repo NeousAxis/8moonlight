@@ -812,6 +812,30 @@ async function scheduleNotification(title, body, date, tag) {
     }
 }
 
+// Planifie une liste de notifications en un seul appel natif (bien plus fiable
+// et rapide qu'un appel par notification quand on en programme plusieurs dizaines).
+async function scheduleBatch(items) {
+    if (!items.length) return;
+
+    if (IS_NATIVE && NativePlugins.LocalNotifications) {
+        try {
+            await NativePlugins.LocalNotifications.schedule({
+                notifications: items.map(n => ({
+                    id: tagToId(n.tag),
+                    title: n.title,
+                    body: n.body,
+                    schedule: { at: n.date, allowWhileIdle: true }
+                }))
+            });
+        } catch (e) { console.log('[LN] scheduleBatch', e); }
+        return;
+    }
+
+    for (const n of items) {
+        await scheduleNotification(n.title, n.body, n.date, n.tag);
+    }
+}
+
 // Annule toutes les notifications déjà planifiées (natif).
 async function cancelAllScheduled() {
     if (IS_NATIVE && NativePlugins.LocalNotifications) {
@@ -824,6 +848,43 @@ async function cancelAllScheduled() {
     }
 }
 
+// iOS ne conserve que 64 notifications locales en attente par application. Au-delà,
+// les plus lointaines sont silencieusement jetées par le système. On garde une marge.
+const MAX_PENDING_NOTIFICATIONS = 58;
+
+// Nombre de phases majeures (NL, PQ, PL, DQ) couvertes par une planification.
+// 52 phases valent environ 13 mois : comme on replanifie à chaque ouverture de l'app,
+// l'utilisateur reste couvert tant qu'il ouvre Moonlight au moins une fois par an.
+const PHASE_HORIZON = 52;
+
+const PHASE_FRACTION_NAMES = {
+    0: "Nouvelle Lune",
+    0.25: "Premier Quartier",
+    0.5: "Pleine Lune",
+    0.75: "Dernier Quartier"
+};
+
+// Les `count` prochaines phases majeures après `from`, triées par date.
+// Chaque phase est recalculée depuis la précédente plutôt qu'obtenue en ajoutant
+// un pas fixe : la dérive ne s'accumule pas sur un horizon d'un an.
+function upcomingPhaseEvents(from, count) {
+    const events = [];
+    let cursor = new Date(from.getTime());
+
+    for (let i = 0; i < count; i++) {
+        let next = null;
+        for (const fraction of [0, 0.25, 0.5, 0.75]) {
+            const date = getNextPhaseDate(fraction, cursor);
+            if (!next || date < next.date) next = { date, fraction };
+        }
+        events.push({ ...next, name: PHASE_FRACTION_NAMES[next.fraction] });
+        // On repart juste après la phase trouvée pour ne pas retomber dessus.
+        cursor = new Date(next.date.getTime() + 60 * 60 * 1000);
+    }
+
+    return events;
+}
+
 async function scheduleAllNotifications() {
     // Interrupteur maître : si les rappels sont désactivés, ne rien planifier.
     if (!notificationSettings.enabled) { await cancelAllScheduled(); return; }
@@ -832,93 +893,63 @@ async function scheduleAllNotifications() {
     // Purge les notifications déjà planifiées avant de reprogrammer (évite les doublons).
     await cancelAllScheduled();
 
-    // Ferme toutes les notifications existantes qui seraient planifiées ?
-    // L'API actuelle overwrite si on utilise le même tag.
-
     const now = new Date();
-    let nextNew = getNextPhaseDate(0, now);
-    let nextFull = getNextPhaseDate(0.5, now);
-    let phases = [];
-    
-    // Prochaines ~2 mois (4 événements majeurs)
-    if (nextFull < nextNew) {
-        for (let i = 0; i < 4; i++) {
-            let d = new Date(nextFull.getTime() + i * (SYNODIC_MONTH / 2) * 24 * 60 * 60 * 1000);
-            phases.push({ date: d, type: i % 2 === 0 ? "Pleine Lune" : "Nouvelle Lune", targetFraction: i % 2 === 0 ? 0.5 : 0.0 });
-        }
-    } else {
-        for (let i = 0; i < 4; i++) {
-            let d = new Date(nextNew.getTime() + i * (SYNODIC_MONTH / 2) * 24 * 60 * 60 * 1000);
-            phases.push({ date: d, type: i % 2 === 0 ? "Nouvelle Lune" : "Pleine Lune", targetFraction: i % 2 === 0 ? 0.0 : 0.5 });
-        }
-    }
+    const events = upcomingPhaseEvents(now, PHASE_HORIZON);
 
-    // Calcul des rappels Pleine/Nouvelle Lune
-    phases.forEach((p) => {
-        let isFull = p.type === "Pleine Lune";
-        let isNew = p.type === "Nouvelle Lune";
-        
+    const queue = [];
+    const enqueue = (date, title, body, tag) => {
+        if (date.getTime() > Date.now()) queue.push({ date, title, body, tag });
+    };
+
+    events.forEach((p) => {
+        const isFull = p.fraction === 0.5;
+        const isNew = p.fraction === 0;
+        const evtTime = p.date.getTime();
+        const dateStr = p.date.toISOString().slice(0, 10);
+
+        // Rappels avant la Pleine / Nouvelle Lune
         if ((isFull && notificationSettings.fullMoon) || (isNew && notificationSettings.newMoon)) {
-            const evtTime = p.date.getTime();
-            const dateStr = p.date.toISOString().slice(0, 10);
-            
             if (notificationSettings.rem3d) {
-                const d3 = new Date(evtTime - 3 * 24 * 60 * 60 * 1000);
-                scheduleNotification(`J-3 ${p.type}`, `Dans 3 jours, ce sera la ${p.type}. Préparez-vous !`, d3, `rem-3d-${dateStr}`);
+                enqueue(new Date(evtTime - 3 * 24 * 60 * 60 * 1000),
+                    `J-3 ${p.name}`, `Dans 3 jours, ce sera la ${p.name}. Préparez-vous !`, `rem-3d-${dateStr}`);
             }
             if (notificationSettings.rem1d) {
-                const d1 = new Date(evtTime - 1 * 24 * 60 * 60 * 1000);
-                scheduleNotification(`J-1 ${p.type}`, `Demain, c'est la ${p.type}.`, d1, `rem-1d-${dateStr}`);
+                enqueue(new Date(evtTime - 1 * 24 * 60 * 60 * 1000),
+                    `J-1 ${p.name}`, `Demain, c'est la ${p.name}.`, `rem-1d-${dateStr}`);
             }
             if (notificationSettings.remDay) {
-                // 1h avant (avant minuit) / 8h avant (après minuit)
-                const hour = p.date.getHours();
-                let hoursBefore = (hour < 12) ? 8 : 1; 
-                // "Après minuit" on considère < 12h (Matin). "Avant minuit" on considère >= 12h (Soir).
-                
-                const dDay = new Date(evtTime - hoursBefore * 60 * 60 * 1000);
-                scheduleNotification(`H-${hoursBefore} ${p.type}`, `La ${p.type} aura lieu dans environ ${hoursBefore} heure(s).`, dDay, `rem-day-${dateStr}`);
+                // Phase le matin : on prévient 8h avant (donc la veille au soir).
+                // Phase l'après-midi ou le soir : 1h avant suffit.
+                const hoursBefore = (p.date.getHours() < 12) ? 8 : 1;
+                enqueue(new Date(evtTime - hoursBefore * 60 * 60 * 1000),
+                    `H-${hoursBefore} ${p.name}`,
+                    `La ${p.name} aura lieu dans environ ${hoursBefore} heure(s).`,
+                    `rem-day-${dateStr}`);
             }
+        }
+
+        // Annonce de la phase + énergie du jour, à 09:00 le jour J, pour les 4 phases.
+        if (notificationSettings.phaseAnnonce) {
+            const notifyDate = new Date(p.date);
+            notifyDate.setHours(9, 0, 0, 0);
+            const extra = getGardenMood(p.fraction * SYNODIC_MONTH, p.fraction, notifyDate);
+            enqueue(notifyDate, `Phase : ${p.name}`, `☀️ Énergie du jour : ${extra.mood}`, `phase-${dateStr}`);
         }
     });
 
-    // Annonces des phases & Énergie (toutes les phases: NL, PQ, PL, DQ)
-    if (notificationSettings.phaseAnnonce) {
-        const majorFractions = [0, 0.25, 0.5, 0.75];
-        const fractionNames = {
-            0: "Nouvelle Lune",
-            0.25: "Premier Quartier",
-            0.5: "Pleine Lune",
-            0.75: "Dernier Quartier"
-        };
-        
-        // Trouver la date des prochaines phases
-        // On prend un point de départ et on cherche les prochaines occurences pour 2 mois
-        let allPhases = [];
-        for (let f of majorFractions) {
-            let pDate = getNextPhaseDate(f, now);
-            allPhases.push({ date: pDate, fraction: f, name: fractionNames[f] });
-            let pDate2 = new Date(pDate.getTime() + SYNODIC_MONTH * 24 * 60 * 60 * 1000);
-            allPhases.push({ date: pDate2, fraction: f, name: fractionNames[f] });
-        }
-        
-        allPhases.forEach(p => {
-            // "Les annonces des différentes phases... l'énergie du jour". 
-            // On peut notifier à 09:00 le jour J pour annoncer l'énergie du jour de la phase.
-            const notifyDate = new Date(p.date);
-            notifyDate.setHours(9, 0, 0, 0);
-            
-            // Si l'heure limite est déjà passée aujourd'hui, on ne notifie pas
-            if (notifyDate.getTime() < Date.now()) return;
-            
-            const dateStr = p.date.toISOString().slice(0, 10);
-            const ageApprox = p.fraction * SYNODIC_MONTH;
-            const extra = getGardenMood(ageApprox, p.fraction, notifyDate);
-            
-            scheduleNotification(`Phase : ${p.name}`, `☀️ Énergie du jour : ${extra.mood}`, notifyDate, `phase-${dateStr}`);
-        });
-    }
+    // On garde les plus proches dans le temps : ce sont celles qui comptent, et
+    // la replanification à chaque ouverture prendra le relais pour la suite.
+    queue.sort((a, b) => a.date - b.date);
+    await scheduleBatch(queue.slice(0, MAX_PENDING_NOTIFICATIONS));
 }
+
+// Replanification au lancement ET à chaque retour au premier plan.
+// Sans ça, les notifications planifiées s'épuisent et l'utilisateur ne reçoit
+// plus jamais rien tant qu'il ne retouche pas un réglage.
+scheduleAllNotifications();
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) scheduleAllNotifications();
+});
 
 // Init
 updateApp();
