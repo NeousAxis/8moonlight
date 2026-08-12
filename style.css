@@ -448,3 +448,98 @@ nav {
     height: 24px;
     fill: currentColor;
 }
+/* --- Événements astronomiques --- */
+
+.card.accent-event { border-left: 4px solid #5b8dff; }
+.card-label.accent-event { color: #5b8dff; }
+
+.event-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+    max-width: 400px;
+    margin-bottom: 18px;
+}
+
+.event-chip {
+    background: var(--card-bg);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: 0.8rem;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.event-chip.on {
+    background: rgba(91, 141, 255, 0.18);
+    border-color: rgba(91, 141, 255, 0.55);
+    color: #cfdcff;
+}
+
+.event-list {
+    width: 100%;
+    max-width: 400px;
+    padding-bottom: 20px;
+}
+
+.event-item {
+    display: flex;
+    gap: 14px;
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+    border-left: 4px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Un événement réellement observable depuis la position de l'utilisateur est
+   mis en avant ; les autres restent listés mais en retrait. */
+.event-item.is-visible { border-left-color: #5b8dff; }
+.event-item.is-major { border-left-color: #ffb43d; }
+.event-item.is-hidden-away { opacity: 0.55; }
+
+.event-emoji {
+    font-size: 1.6rem;
+    line-height: 1;
+    flex-shrink: 0;
+    width: 32px;
+    text-align: center;
+}
+
+.event-body { flex: 1; min-width: 0; }
+
+.event-when {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    margin-bottom: 3px;
+}
+
+.event-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.event-detail {
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
+.event-countdown {
+    color: #5b8dff;
+    font-weight: 600;
+}
+
+.event-empty {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    text-align: center;
+    padding: 30px 10px;
+}

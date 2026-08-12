@@ -8,6 +8,17 @@ default_platform(:ios)
 BUNDLE_ID = "com.cyrilleger.moonlight"
 TEAM_ID   = "BXB662X8PV"
 
+# build_app empaquette ce qui se trouve dans ios/App/App/public/, sans jamais
+# regarder les sources a la racine du depot. Sans cette etape, une modification
+# de script.js / index.html / astro.js commitee mais non recopiee est absente du
+# build, qui part alors avec le contenu de la copie precedente : le numero de
+# build change, le contenu non. C'est arrive sur le build 11 du 2026-08-12.
+def sync_web_assets
+  root = File.expand_path("../../..", __dir__)
+  UI.message("Synchronisation des sources web depuis #{root}")
+  sh("cd #{root.shellescape} && npm run build && npx cap copy ios")
+end
+
 def asc_key
   app_store_connect_api_key(
     key_id: "8QAFD5C266",
@@ -25,6 +36,7 @@ platform :ios do
   desc "Build + upload App + Widget to App Store Connect (TestFlight, no review)"
   lane :release_widget do
     api_key = asc_key
+    sync_web_assets
     update_project_team(path: "App.xcodeproj", teamid: TEAM_ID)
     update_info_plist(
       xcodeproj: "App.xcodeproj",
@@ -58,6 +70,7 @@ platform :ios do
   desc "Build + upload to App Store Connect (TestFlight, no review)"
   lane :release do
     api_key = asc_key
+    sync_web_assets
     update_project_team(path: "App.xcodeproj", teamid: TEAM_ID)
     get_certificates(api_key: api_key)
     get_provisioning_profile(
@@ -123,6 +136,7 @@ platform :ios do
   desc "Build a signed .ipa only (no upload)"
   lane :build_only do
     api_key = asc_key
+    sync_web_assets
     update_project_team(path: "App.xcodeproj", teamid: TEAM_ID)
     get_certificates(api_key: api_key)
     get_provisioning_profile(
