@@ -11,6 +11,8 @@ const www = join(root, "www");
 const ASSETS = [
   "index.html",
   "script.js",
+  "astro.js",
+  "vendor/astronomy.browser.min.js",
   "style.css",
   "sw.js",
   "manifest.json",
@@ -28,7 +30,10 @@ let copied = 0;
 for (const f of ASSETS) {
   const src = join(root, f);
   if (existsSync(src)) {
-    copyFileSync(src, join(www, f));
+    // Certains assets vivent dans un sous-dossier (vendor/), à recréer côté www.
+    const dest = join(www, f);
+    mkdirSync(dirname(dest), { recursive: true });
+    copyFileSync(src, dest);
     copied++;
   } else {
     console.warn(`[build-www] missing asset: ${f}`);

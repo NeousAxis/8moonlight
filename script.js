@@ -88,12 +88,27 @@ const els = {
     gardenAction: document.getElementById('gardenAction'),
     moodText: document.getElementById('moodText'),
     seasonalText: document.getElementById('seasonalText'),
-    seasonalTitle: document.getElementById('seasonalTitle')
+    seasonalTitle: document.getElementById('seasonalTitle'),
+    cardNextEvent: document.getElementById('cardNextEvent'),
+    nextEventIcon: document.getElementById('nextEventIcon'),
+    nextEventTitle: document.getElementById('nextEventTitle'),
+    nextEventWhen: document.getElementById('nextEventWhen'),
+    nextEventDetail: document.getElementById('nextEventDetail'),
+    eventFilters: document.getElementById('eventFilters'),
+    eventsList: document.getElementById('eventsList'),
+    eventsIntro: document.getElementById('eventsIntro')
 };
 
 // --- Constants ---
 const SYNODIC_MONTH = 29.53058867;
 const REFERENCE_NEW_MOON = new Date('2000-01-06T12:24:00Z');
+
+// Moteur astronomique précis (astro.js, adossé à astronomy-engine). Le modèle
+// synodique moyen ci-dessus reste en place uniquement comme repli : il place les
+// phases à plusieurs heures, parfois un jour entier, de leur instant réel, et il
+// ne sait rien des éclipses, des saisons ni des planètes.
+const ASTRO_OK = !!(window.Astro && window.Astro.ready);
+if (ASTRO_OK) Astro.setTimezone(state.timezone);
 
 // --- Gardening & Mood Logic ---
 const GARDEN_ADVICE = {
@@ -363,12 +378,21 @@ function getGardenMood(age, phaseFraction, targetDate = new Date()) {
 // --- Astronomical Logic ---
 
 function getMoonData(date, timezone) {
-    const diffTime = date.getTime() - REFERENCE_NEW_MOON.getTime();
-    const diffDays = diffTime / (1000 * 60 * 60 * 24);
-    const age = diffDays % SYNODIC_MONTH;
-    if (age < 0) age += SYNODIC_MONTH;
-    const phaseFraction = age / SYNODIC_MONTH;
-    const illumination = 0.5 * (1 - Math.cos(2 * Math.PI * phaseFraction));
+    let age, phaseFraction, illumination;
+
+    if (ASTRO_OK) {
+        const st = Astro.moonState(date);
+        age = st.age;
+        phaseFraction = st.phaseFraction;
+        illumination = st.illumination;
+    } else {
+        const diffTime = date.getTime() - REFERENCE_NEW_MOON.getTime();
+        const diffDays = diffTime / (1000 * 60 * 60 * 24);
+        age = diffDays % SYNODIC_MONTH;
+        if (age < 0) age += SYNODIC_MONTH;
+        phaseFraction = age / SYNODIC_MONTH;
+        illumination = 0.5 * (1 - Math.cos(2 * Math.PI * phaseFraction));
+    }
 
     let phaseName = "";
     if (phaseFraction < 0.02 || phaseFraction > 0.98) phaseName = "Nouvelle Lune";
@@ -384,6 +408,14 @@ function getMoonData(date, timezone) {
 }
 
 function getNextPhaseDate(targetPhaseFraction, startDate) {
+    // Les seules fractions demandées par l'app sont les quatre phases majeures.
+    // Le moteur précis donne leur instant exact, à la seconde près.
+    if (ASTRO_OK) {
+        const quarter = Math.round(targetPhaseFraction * 4) % 4;
+        const exact = Astro.nextQuarter(startDate, quarter);
+        if (exact) return exact;
+    }
+
     const currentData = getMoonData(startDate);
     let daysToAdd = 0;
     if (targetPhaseFraction > currentData.phaseFraction) {
@@ -505,9 +537,17 @@ function updateApp() {
         }
     }
 
-    // Detail View
-    els.moonRise.textContent = "06:" + Math.floor(6 + (data.age / SYNODIC_MONTH) * 24 % 24).toString().padStart(2, '0'); // Approx
-    els.moonSet.textContent = "18:" + Math.floor(18 + (data.age / SYNODIC_MONTH) * 24 % 24).toString().padStart(2, '0'); // Approx
+    // Detail View : lever et coucher réels, calculés pour la position de
+    // l'utilisateur. Sans position connue on n'affiche rien plutôt que d'inventer
+    // une heure, ce que faisait la version précédente.
+    if (ASTRO_OK && state.hasLocation && typeof state.lat === 'number' && typeof state.lon === 'number') {
+        const rs = Astro.moonState(now, state.lat, state.lon);
+        els.moonRise.textContent = rs.rise ? formatLocal(rs.rise, tz) : "Pas de lever aujourd'hui";
+        els.moonSet.textContent = rs.set ? formatLocal(rs.set, tz) : "Pas de coucher aujourd'hui";
+    } else {
+        els.moonRise.textContent = "Position requise";
+        els.moonSet.textContent = "Position requise";
+    }
 
     // --- NEW: Garden & Mood Logic (UNIQUEMENT si localisation confirmée) ---
     if (state.hasLocation && els.gardenIcon) {
@@ -544,23 +584,30 @@ function updateApp() {
     generateUpcomingList(now, tz);
     els.widgetIllum.textContent = `${Math.round(data.illumination * 100)}%`;
     els.widgetMoonIcon.innerHTML = `<svg viewBox="0 0 100 100" width="100%" height="100%"><circle cx="50" cy="50" r="48" fill="#333"/><path fill="white" d="${els.moonPath.getAttribute('d')}"/></svg>`;
+
+    // Le calcul des événements sur douze mois prend une centaine de millisecondes.
+    // On le repousse d'un tick pour laisser la Lune s'afficher immédiatement.
+    if (ASTRO_OK) setTimeout(renderEvents, 0);
 }
 
 function generateUpcomingList(now, tz) {
     els.upcomingPhasesList.innerHTML = '';
-    let nextNew = getNextPhaseDate(0, now);
-    let nextFull = getNextPhaseDate(0.5, now);
     let phases = [];
 
-    if (nextFull < nextNew) {
-        for (let i = 0; i < 6; i++) {
-            let d = new Date(nextFull.getTime() + i * (SYNODIC_MONTH / 2) * 24 * 60 * 60 * 1000);
-            phases.push({ date: d, type: i % 2 === 0 ? "Pleine Lune" : "Nouvelle Lune" });
-        }
+    if (ASTRO_OK) {
+        // Instants exacts des pleines et nouvelles lunes, sans dérive cumulée.
+        phases = Astro.nextPhases(now, 14)
+            .filter(p => p.quarter === 0 || p.quarter === 2)
+            .slice(0, 6)
+            .map(p => ({ date: p.date, type: p.name }));
     } else {
+        const nextNew = getNextPhaseDate(0, now);
+        const nextFull = getNextPhaseDate(0.5, now);
+        const start = (nextFull < nextNew) ? nextFull : nextNew;
+        const first = (nextFull < nextNew) ? "Pleine Lune" : "Nouvelle Lune";
         for (let i = 0; i < 6; i++) {
-            let d = new Date(nextNew.getTime() + i * (SYNODIC_MONTH / 2) * 24 * 60 * 60 * 1000);
-            phases.push({ date: d, type: i % 2 === 0 ? "Nouvelle Lune" : "Pleine Lune" });
+            const d = new Date(start.getTime() + i * SYNODIC_MONTH / 2 * 24 * 60 * 60 * 1000);
+            phases.push({ date: d, type: i % 2 === 0 ? first : (first === "Pleine Lune" ? "Nouvelle Lune" : "Pleine Lune") });
         }
     }
 
@@ -574,6 +621,196 @@ function generateUpcomingList(now, tz) {
                 <div class="phase-time">${formatDateLocal(p.date, tz)} • ${formatLocal(p.date, tz)}</div>
             </div>`;
         els.upcomingPhasesList.appendChild(div);
+    });
+}
+
+// --- Événements astronomiques ---
+
+// Fenêtre couverte par la liste et par les alertes.
+const EVENT_HORIZON_DAYS = 365;
+
+// Correspondance entre un type d'événement et le réglage qui l'autorise à notifier.
+const EVENT_SETTING = {
+    'eclipse-solar': 'evtEclipse',
+    'eclipse-lunar': 'evtEclipse',
+    supermoon: 'evtLune',
+    micromoon: 'evtLune',
+    bluemoon: 'evtLune',
+    blackmoon: 'evtLune',
+    meteor: 'evtMeteor',
+    planet: 'evtPlanet',
+    conjunction: 'evtPlanet',
+    season: 'evtSaison'
+};
+
+let eventCache = null;      // { key, list }
+let eventFilter = 'all';
+
+// Les événements dépendent de la position et du jour ; on ne recalcule que si
+// l'un des deux a bougé. Le calcul complet prend moins de 100 ms, mais autant
+// éviter de le refaire à chaque rendu.
+function getEvents() {
+    if (!ASTRO_OK) return [];
+
+    const hasPos = state.hasLocation && typeof state.lat === 'number' && typeof state.lon === 'number';
+    const now = new Date();
+    const key = [
+        now.toISOString().slice(0, 10),
+        hasPos ? state.lat.toFixed(2) : 'x',
+        hasPos ? state.lon.toFixed(2) : 'x'
+    ].join('|');
+
+    if (eventCache && eventCache.key === key) return eventCache.list;
+
+    const to = new Date(now.getTime() + EVENT_HORIZON_DAYS * 24 * 60 * 60 * 1000);
+    let list = [];
+    try {
+        list = hasPos ? Astro.events(now, to, state.lat, state.lon) : Astro.events(now, to);
+    } catch (e) {
+        console.log('[Astro] events', e);
+        list = [];
+    }
+
+    eventCache = { key, list };
+    return list;
+}
+
+// « dans 3 jours », « demain », « aujourd'hui »...
+function countdownLabel(date) {
+    const now = new Date();
+    const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
+    const startOfEvent = new Date(date); startOfEvent.setHours(0, 0, 0, 0);
+    const days = Math.round((startOfEvent - startOfToday) / (24 * 60 * 60 * 1000));
+
+    if (days <= 0) return "Aujourd'hui";
+    if (days === 1) return 'Demain';
+    if (days < 31) return 'Dans ' + days + ' jours';
+    const months = Math.round(days / 30.44);
+    return 'Dans ' + months + ' mois';
+}
+
+function renderNextEventCard() {
+    if (!els.cardNextEvent) return;
+
+    const list = getEvents();
+    const visible = list.filter(e => e.visible);
+
+    // Dans la semaine qui vient, on met en avant l'événement le plus marquant
+    // plutôt que le plus proche : une éclipse passe avant un essaim de météores
+    // qui tombe le même jour. Au-delà, on affiche simplement le prochain.
+    const soon = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const imminent = visible.filter(e => e.date <= soon);
+    const next = imminent.length
+        ? imminent.reduce((best, e) => (e.importance > best.importance ? e : best), imminent[0])
+        : (visible[0] || list[0]);
+
+    if (!next) {
+        els.cardNextEvent.style.display = 'none';
+        return;
+    }
+
+    els.cardNextEvent.style.display = '';
+    els.nextEventIcon.textContent = next.icon;
+    els.nextEventTitle.textContent = next.title;
+    els.nextEventWhen.textContent = countdownLabel(next.date) + ' • ' + Astro.dayLabel(next.date) + ' à ' + Astro.hm(next.date);
+    els.nextEventDetail.textContent = next.detail;
+}
+
+function renderEventFilters() {
+    if (!els.eventFilters || els.eventFilters.children.length) return;
+
+    const filters = [
+        { key: 'all', label: 'Tout' },
+        { key: 'Éclipse', label: 'Éclipses' },
+        { key: 'Lune', label: 'Lune' },
+        { key: 'Météores', label: 'Météores' },
+        { key: 'Planète', label: 'Planètes' },
+        { key: 'Saison', label: 'Saisons' }
+    ];
+
+    filters.forEach(f => {
+        const b = document.createElement('button');
+        b.className = 'event-chip' + (f.key === eventFilter ? ' on' : '');
+        b.textContent = f.label;
+        b.dataset.key = f.key;
+        b.addEventListener('click', () => {
+            eventFilter = f.key;
+            Array.from(els.eventFilters.children).forEach(c => c.classList.toggle('on', c.dataset.key === eventFilter));
+            renderEventsList();
+        });
+        els.eventFilters.appendChild(b);
+    });
+}
+
+function renderEventsList() {
+    if (!els.eventsList) return;
+
+    if (!ASTRO_OK) {
+        els.eventsList.innerHTML = '<div class="event-empty">Le moteur astronomique n\'a pas pu être chargé.</div>';
+        return;
+    }
+
+    const hasPos = state.hasLocation && typeof state.lat === 'number' && typeof state.lon === 'number';
+    if (els.eventsIntro) {
+        els.eventsIntro.textContent = hasPos
+            ? "Éclipses, solstices, super lunes, pluies d'étoiles filantes et planètes, calculés pour votre position sur les douze prochains mois."
+            : "Éclipses, solstices, super lunes, pluies d'étoiles filantes et planètes sur les douze prochains mois. Indiquez votre position dans Réglages pour savoir ce qui est visible de chez vous.";
+    }
+
+    const list = getEvents().filter(e => eventFilter === 'all' || e.category === eventFilter);
+    els.eventsList.innerHTML = '';
+
+    if (!list.length) {
+        els.eventsList.innerHTML = '<div class="event-empty">Aucun événement de cette catégorie dans les douze prochains mois.</div>';
+        return;
+    }
+
+    list.forEach(e => {
+        const div = document.createElement('div');
+        div.className = 'event-item'
+            + (e.importance >= 3 ? ' is-major' : (e.visible ? ' is-visible' : ''))
+            + (e.visible ? '' : ' is-hidden-away');
+
+        const when = document.createElement('div');
+        when.className = 'event-when';
+        when.innerHTML = '<span class="event-countdown">' + countdownLabel(e.date) + '</span> • '
+            + Astro.dayLabel(e.date) + ' à ' + Astro.hm(e.date);
+
+        const title = document.createElement('div');
+        title.className = 'event-title';
+        title.textContent = e.title;
+
+        const detail = document.createElement('div');
+        detail.className = 'event-detail';
+        detail.textContent = e.detail;
+
+        const emoji = document.createElement('div');
+        emoji.className = 'event-emoji';
+        emoji.textContent = e.icon;
+
+        const body = document.createElement('div');
+        body.className = 'event-body';
+        body.appendChild(when);
+        body.appendChild(title);
+        body.appendChild(detail);
+
+        div.appendChild(emoji);
+        div.appendChild(body);
+        els.eventsList.appendChild(div);
+    });
+}
+
+function renderEvents() {
+    renderNextEventCard();
+    renderEventFilters();
+    renderEventsList();
+}
+
+// Depuis la carte d'accueil, on bascule sur l'onglet Ciel.
+if (els.cardNextEvent) {
+    els.cardNextEvent.addEventListener('click', () => {
+        const target = document.querySelector('.nav-item[data-target="view-events"]');
+        if (target) target.click();
     });
 }
 
@@ -655,7 +892,12 @@ const uiToggles = {
     rem3d: document.getElementById('toggleRem3d'),
     rem1d: document.getElementById('toggleRem1d'),
     remDay: document.getElementById('toggleRemDay'),
-    phaseAnnonce: document.getElementById('togglePhaseAnnonce')
+    phaseAnnonce: document.getElementById('togglePhaseAnnonce'),
+    evtEclipse: document.getElementById('toggleEvtEclipse'),
+    evtLune: document.getElementById('toggleEvtLune'),
+    evtMeteor: document.getElementById('toggleEvtMeteor'),
+    evtPlanet: document.getElementById('toggleEvtPlanet'),
+    evtSaison: document.getElementById('toggleEvtSaison')
 };
 
 let notificationSettings = {
@@ -665,7 +907,15 @@ let notificationSettings = {
     rem3d: false,
     rem1d: false,
     remDay: true,
-    phaseAnnonce: false
+    phaseAnnonce: false,
+    // Événements astronomiques. Les éclipses, les super lunes et les grandes
+    // pluies d'étoiles filantes sont actives par défaut : ce sont les rendez-vous
+    // qu'on regrette d'avoir manqués.
+    evtEclipse: true,
+    evtLune: true,
+    evtMeteor: true,
+    evtPlanet: false,
+    evtSaison: false
 };
 
 // Load saved toggle states
@@ -936,6 +1186,58 @@ async function scheduleAllNotifications() {
             enqueue(notifyDate, `Phase : ${p.name}`, `☀️ Énergie du jour : ${extra.mood}`, `phase-${dateStr}`);
         }
     });
+
+    // Événements astronomiques : éclipses, super lunes, essaims de météores,
+    // planètes, saisons. Chacun est annoncé au moment où l'utilisateur peut encore
+    // s'organiser, et non au moment où il est déjà trop tard.
+    if (ASTRO_OK) {
+        const atHour = (d, h) => { const x = new Date(d); x.setHours(h, 0, 0, 0); return x; };
+
+        getEvents().forEach((e) => {
+            const setting = EVENT_SETTING[e.type];
+            if (!setting || !notificationSettings[setting]) return;
+
+            // Un événement non visible depuis la position n'a pas à réveiller
+            // le téléphone. Il reste consultable dans l'onglet Ciel.
+            if (!e.visible) return;
+
+            if (e.type === 'eclipse-solar' && e.beginDate) {
+                // La veille au soir, puis une heure avant le premier contact.
+                enqueue(atHour(new Date(e.beginDate.getTime() - 24 * 60 * 60 * 1000), 18),
+                    'Demain : ' + e.title,
+                    'Début à ' + Astro.hm(e.beginDate) + '. Pensez à vos lunettes d\'éclipse certifiées ISO 12312-2.',
+                    'evt-' + e.id + '-j1');
+                enqueue(new Date(e.beginDate.getTime() - 60 * 60 * 1000),
+                    e.title + ' dans une heure',
+                    'Début à ' + Astro.hm(e.beginDate) + '. Ne regardez jamais le Soleil sans lunettes d\'éclipse certifiées.',
+                    'evt-' + e.id + '-h1');
+                return;
+            }
+
+            if (e.type === 'eclipse-lunar') {
+                enqueue(atHour(new Date(e.date.getTime() - 24 * 60 * 60 * 1000), 18),
+                    'Demain : ' + e.title, 'Maximum à ' + Astro.hm(e.date) + '. Observable à l\'œil nu.', 'evt-' + e.id + '-j1');
+                enqueue(new Date(e.date.getTime() - 60 * 60 * 1000),
+                    e.title + ' dans une heure', 'Maximum à ' + Astro.hm(e.date) + '.', 'evt-' + e.id + '-h1');
+                return;
+            }
+
+            if (e.type === 'meteor') {
+                // Un essaim s'observe la nuit : on prévient en début de soirée.
+                enqueue(atHour(e.date, 21), e.title, e.detail, 'evt-' + e.id);
+                return;
+            }
+
+            if (e.type === 'season') {
+                enqueue(atHour(e.date, 9), e.title, e.detail, 'evt-' + e.id);
+                return;
+            }
+
+            // Super lunes, lunes bleues, planètes, rapprochements : en fin
+            // d'après-midi, quand on peut encore décider de sortir le soir.
+            enqueue(atHour(e.date, 18), e.title, e.detail, 'evt-' + e.id);
+        });
+    }
 
     // On garde les plus proches dans le temps : ce sont celles qui comptent, et
     // la replanification à chaque ouverture prendra le relais pour la suite.

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Moonlight</title>
-    <link rel="stylesheet" href="style.css?v=2.5">
+    <link rel="stylesheet" href="style.css?v=2.6">
     <link rel="icon" type="image/png" href="icon-192.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
@@ -59,6 +59,18 @@
                     <span class="card-value" id="nextFullDate">--</span>
                     <span class="card-label countdown-value" id="nextFullCountdown">--</span>
                 </div>
+
+                <!-- PROCHAIN ÉVÉNEMENT ASTRONOMIQUE -->
+                <button class="card accent-event" id="cardNextEvent" style="display:none; text-align:left; border:none; font:inherit; color:inherit; cursor:pointer;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <span class="card-label accent-event">Prochain événement</span>
+                        <span id="nextEventIcon" style="font-size:1.5rem;">✨</span>
+                    </div>
+                    <div id="nextEventTitle" style="font-size:1.1rem; font-weight:600; margin-bottom:4px;">--</div>
+                    <div id="nextEventWhen" class="card-label countdown-value" style="margin-bottom:8px;">--</div>
+                    <div id="nextEventDetail"
+                        style="font-size:0.9rem; color:var(--text-secondary); line-height:1.45;">--</div>
+                </button>
 
                 <!-- JARDIN CARD -->
                 <div class="card accent-garden">
@@ -115,6 +127,17 @@
 
             <h3 class="settings-title">6 Prochaines Phases</h3>
             <div class="phase-list" id="upcomingPhasesList"></div>
+        </section>
+
+        <!-- EVENTS VIEW -->
+        <section id="view-events" class="view">
+            <h2 style="margin-bottom:6px; font-weight:300;">Le ciel à venir</h2>
+            <p id="eventsIntro" style="font-size:0.85rem; color:var(--text-secondary); margin:0 0 18px; line-height:1.5;">
+                Éclipses, solstices, super lunes, pluies d'étoiles filantes et planètes, sur les douze prochains mois.
+            </p>
+
+            <div class="event-filters" id="eventFilters"></div>
+            <div class="event-list" id="eventsList"></div>
         </section>
 
         <!-- SETTINGS / WIDGET VIEW -->
@@ -191,6 +214,32 @@
                     <span>Annonce des phases & Énergie</span>
                     <div class="toggle-switch" id="togglePhaseAnnonce"></div>
                 </div>
+
+                <h4 style="margin:20px 0 10px; font-size:0.9rem; font-weight:400; color:var(--text-secondary);">Événements astronomiques</h4>
+                <div class="toggle-row">
+                    <span>Éclipses visibles chez moi</span>
+                    <div class="toggle-switch on" id="toggleEvtEclipse"></div>
+                </div>
+                <div class="toggle-row">
+                    <span>Super Lunes, lunes bleues</span>
+                    <div class="toggle-switch on" id="toggleEvtLune"></div>
+                </div>
+                <div class="toggle-row">
+                    <span>Pluies d'étoiles filantes</span>
+                    <div class="toggle-switch on" id="toggleEvtMeteor"></div>
+                </div>
+                <div class="toggle-row">
+                    <span>Planètes et rapprochements</span>
+                    <div class="toggle-switch" id="toggleEvtPlanet"></div>
+                </div>
+                <div class="toggle-row">
+                    <span>Solstices et équinoxes</span>
+                    <div class="toggle-switch" id="toggleEvtSaison"></div>
+                </div>
+                <p style="font-size:0.8rem; color:var(--text-secondary); margin:12px 0 0; line-height:1.5;">
+                    Les événements vous sont annoncés la veille au soir, puis le jour même. Les éclipses visibles
+                    depuis chez vous sont en plus rappelées une heure avant le début.
+                </p>
             </div>
 
             <div class="settings-group">
@@ -219,6 +268,12 @@
             </svg>
             Détails
         </button>
+        <button class="nav-item" data-target="view-events">
+            <svg class="nav-icon" viewBox="0 0 24 24">
+                <path d="M12 2l2.2 5.9L20 10l-5.8 2.1L12 18l-2.2-5.9L4 10l5.8-2.1L12 2zm6.5 11l.9 2.4 2.6.9-2.6.9-.9 2.4-.9-2.4-2.6-.9 2.6-.9.9-2.4z" />
+            </svg>
+            Ciel
+        </button>
         <button class="nav-item" data-target="view-settings">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
@@ -230,7 +285,10 @@
         </button>
     </nav>
 
-    <script src="script.js?v=2.5"></script>
+    <!-- Moteur astronomique : calculs locaux, hors ligne, aucun appel réseau. -->
+    <script src="vendor/astronomy.browser.min.js?v=2.6"></script>
+    <script src="astro.js?v=2.6"></script>
+    <script src="script.js?v=2.6"></script>
 </body>
 
 </html>
