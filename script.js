@@ -28,6 +28,38 @@ async function notifGranted() {
     return ('Notification' in window) && Notification.permission === 'granted';
 }
 
+// --- Reverse geocoding ---
+// On veut le nom de la COMMUNE, jamais celui de la région. Nominatim ne remplit
+// pas toujours `city` : pour un village suisse il ne renvoie que `village`
+// (+ `hamlet`), pendant que `state` contient le canton ("Vaud"). L'ordre ci-dessous
+// va donc du plus local au plus large, et les niveaux régionaux (`county`, `state`,
+// `province`) n'arrivent qu'en dernier recours, faute de mieux.
+const LOCALITY_FIELDS = [
+    'city', 'town', 'village', 'municipality', 'hamlet',
+    'suburb', 'city_district', 'borough', 'quarter',
+    'county', 'state_district', 'state', 'province'
+];
+
+function pickLocalityName(addr) {
+    for (const field of LOCALITY_FIELDS) {
+        const name = addr[field];
+        if (!name) continue;
+        // Au Vietnam, Nominatim remplit city/town avec le quartier administratif
+        // ("Phường ...") ou le district ("Huyện ...") : on passe au niveau suivant.
+        if (name.includes('Phường') || name.includes('Huyện')) continue;
+        return name;
+    }
+    return 'Position GPS';
+}
+
+// Retourne { city, country } pour des coordonnées, ou null si l'adresse est absente.
+async function reverseGeocode(lat, lon) {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=fr`);
+    const data = await res.json();
+    if (!data || !data.address) return null;
+    return { city: pickLocalityName(data.address), country: data.address.country || "" };
+}
+
 // Identifiant entier stable dérivé d'un tag (requis par LocalNotifications).
 function tagToId(tag) {
     let h = 0;
@@ -853,16 +885,10 @@ document.getElementById('btnGps').addEventListener('click', async () => {
     state.isManual = false;
 
     try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${state.lat}&lon=${state.lon}&accept-language=fr`);
-        const data = await res.json();
-        if (data && data.address) {
-            const addr = data.address;
-            let cityName = addr.city || addr.town || addr.state || addr.province || addr.municipality || addr.village || "Position GPS";
-            if (cityName.includes("Phường") || cityName.includes("Huyện")) {
-                cityName = addr.state || addr.province || cityName;
-            }
-            state.city = cityName;
-            state.country = addr.country || "";
+        const place = await reverseGeocode(state.lat, state.lon);
+        if (place) {
+            state.city = place.city;
+            state.country = place.country;
             els.gpsStatus.textContent = `Position : ${state.city}`;
         } else {
             els.gpsStatus.textContent = "Position trouvée !";
@@ -1284,16 +1310,10 @@ if (state.hasLocation && !state.isManual && (IS_NATIVE || ('geolocation' in navi
         state.lat = pos.coords.latitude;
         state.lon = pos.coords.longitude;
         try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${state.lat}&lon=${state.lon}&accept-language=fr`);
-            const data = await res.json();
-            if (data && data.address) {
-                const addr = data.address;
-                let cityName = addr.city || addr.town || addr.state || addr.province || addr.municipality || addr.village || "Position GPS";
-                if (cityName.includes("Phường") || cityName.includes("Huyện")) {
-                    cityName = addr.state || addr.province || cityName;
-                }
-                state.city = cityName;
-                state.country = addr.country || "";
+            const place = await reverseGeocode(state.lat, state.lon);
+            if (place) {
+                state.city = place.city;
+                state.country = place.country;
                 saveState();
                 updateApp();
             }
