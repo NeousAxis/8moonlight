@@ -1066,6 +1066,13 @@ if (btnRequestNotifications) {
     });
 }
 
+// Son des notifications. Le plugin Capacitor ne pose `content.sound` que si le
+// champ `sound` est fourni : sans lui, iOS livre TOUTES les notifications en
+// silence (documenté noir sur blanc dans le README du plugin, « no sound on iOS »).
+// Un nom de fichier absent du bundle fait jouer le son système par défaut, c'est
+// la seule façon d'obtenir le son standard avec ce plugin.
+const NOTIFICATION_SOUND = 'default.wav';
+
 async function scheduleNotification(title, body, date, tag) {
     if (date.getTime() < Date.now()) return; // Passée
 
@@ -1077,6 +1084,7 @@ async function scheduleNotification(title, body, date, tag) {
                     id: tagToId(tag),
                     title: title,
                     body: body,
+                    sound: NOTIFICATION_SOUND,
                     schedule: { at: date, allowWhileIdle: true }
                 }]
             });
@@ -1122,6 +1130,7 @@ async function scheduleBatch(items) {
                     id: tagToId(n.tag),
                     title: n.title,
                     body: n.body,
+                    sound: NOTIFICATION_SOUND,
                     schedule: { at: n.date, allowWhileIdle: true }
                 }))
             });
@@ -1387,3 +1396,4 @@ if (!IS_NATIVE && 'serviceWorker' in navigator) {
         }
     });
 }
+
