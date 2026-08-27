@@ -994,9 +994,14 @@ function saveToggleStates() {
 // Initialize toggles from localStorage
 loadToggleStates();
 
-// Add click handlers with persistence
+// Add click handlers with persistence.
+// La pastille ne fait que 44 x 24 px, sous la cible tactile minimale d'iOS : on rend
+// toute la ligne cliquable, libellé compris, pour qu'un réglage ne reste pas éteint
+// parce que le doigt a manqué l'interrupteur de deux millimètres.
 document.querySelectorAll('.toggle-switch').forEach(t => {
-    t.addEventListener('click', () => {
+    const zone = t.closest('.toggle-row') || t;
+    zone.style.cursor = 'pointer';
+    zone.addEventListener('click', () => {
         t.classList.toggle('on');
         saveToggleStates();
     });
@@ -1150,6 +1155,26 @@ const MAX_PENDING_NOTIFICATIONS = 58;
 // l'utilisateur reste couvert tant qu'il ouvre Moonlight au moins une fois par an.
 const PHASE_HORIZON = 52;
 
+// Heures d'envoi des rappels de phase. Compter en heures pleines depuis l'instant
+// exact de la phase envoie le rappel une fois sur trois entre minuit et 8 h : iOS le
+// range alors en silence dans le résumé du mode Sommeil et l'utilisateur ne le voit
+// jamais passer. On fixe donc une heure d'envoi, comme pour les événements du ciel.
+const REMINDER_HOUR_MORNING = 9;       // J-3 : le matin, il reste trois jours
+const REMINDER_HOUR_EVENING = 18;      // J-1 : en fin de journée
+const REMINDER_HOUR_NIGHT_BEFORE = 21; // la veille au soir, pour une phase matinale
+
+// Ramène une date à `hour:00` locale, `daysBefore` jours plus tôt. L'arithmétique
+// passe par le calendrier local : un changement d'heure entre les deux dates ne
+// décale pas le rappel.
+function atHourBefore(date, daysBefore, hour) {
+    const d = new Date(date);
+    d.setDate(d.getDate() - daysBefore);
+    d.setHours(hour, 0, 0, 0);
+    return d;
+}
+
+const atHour = (date, hour) => atHourBefore(date, 0, hour);
+
 const PHASE_FRACTION_NAMES = {
     0: "Nouvelle Lune",
     0.25: "Premier Quartier",
@@ -1202,22 +1227,29 @@ async function scheduleAllNotifications() {
 
         // Rappels avant la Pleine / Nouvelle Lune
         if ((isFull && notificationSettings.fullMoon) || (isNew && notificationSettings.newMoon)) {
+            const hm = p.date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
             if (notificationSettings.rem3d) {
-                enqueue(new Date(evtTime - 3 * 24 * 60 * 60 * 1000),
+                enqueue(atHourBefore(p.date, 3, REMINDER_HOUR_MORNING),
                     `J-3 ${p.name}`, `Dans 3 jours, ce sera la ${p.name}. Préparez-vous !`, `rem-3d-${dateStr}`);
             }
             if (notificationSettings.rem1d) {
-                enqueue(new Date(evtTime - 1 * 24 * 60 * 60 * 1000),
-                    `J-1 ${p.name}`, `Demain, c'est la ${p.name}.`, `rem-1d-${dateStr}`);
+                enqueue(atHourBefore(p.date, 1, REMINDER_HOUR_EVENING),
+                    `J-1 ${p.name}`, `Demain, c'est la ${p.name}, à ${hm}.`, `rem-1d-${dateStr}`);
             }
             if (notificationSettings.remDay) {
-                // Phase le matin : on prévient 8h avant (donc la veille au soir).
-                // Phase l'après-midi ou le soir : 1h avant suffit.
-                const hoursBefore = (p.date.getHours() < 12) ? 8 : 1;
-                enqueue(new Date(evtTime - hoursBefore * 60 * 60 * 1000),
-                    `H-${hoursBefore} ${p.name}`,
-                    `La ${p.name} aura lieu dans environ ${hoursBefore} heure(s).`,
-                    `rem-day-${dateStr}`);
+                // Une phase qui tombe avant midi s'annonce la veille au soir : compter
+                // « 8 h avant » ramènerait le rappel à 2 h du matin pour une phase de 10 h.
+                // Après midi, une heure avant suffit et reste dans les heures éveillées.
+                if (p.date.getHours() < 12) {
+                    enqueue(atHourBefore(p.date, 1, REMINDER_HOUR_NIGHT_BEFORE),
+                        `Demain matin : ${p.name}`,
+                        `La ${p.name} a lieu demain à ${hm}.`, `rem-day-${dateStr}`);
+                } else {
+                    enqueue(new Date(evtTime - 60 * 60 * 1000),
+                        `H-1 ${p.name}`,
+                        `La ${p.name} aura lieu dans environ une heure.`, `rem-day-${dateStr}`);
+                }
             }
         }
 
@@ -1234,8 +1266,6 @@ async function scheduleAllNotifications() {
     // planètes, saisons. Chacun est annoncé au moment où l'utilisateur peut encore
     // s'organiser, et non au moment où il est déjà trop tard.
     if (ASTRO_OK) {
-        const atHour = (d, h) => { const x = new Date(d); x.setHours(h, 0, 0, 0); return x; };
-
         getEvents().forEach((e) => {
             const setting = EVENT_SETTING[e.type];
             if (!setting || !notificationSettings[setting]) return;
